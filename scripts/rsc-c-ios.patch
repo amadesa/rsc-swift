@@ -1,0 +1,1608 @@
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/mudclient-ios.c b/mudclient-ios.c
+--- a/mudclient-ios.c	1969-12-31 18:00:00
++++ b/mudclient-ios.c	2026-10-05 11:07:59
+@@ -0,0 +1,505 @@
++#include "mudclient.h"
++#include "rsc-bridge.h"
++#include "ui/worldlist.h"
++
++#ifdef IOS
++
++#include <pthread.h>
++
++/*
++ * iOS platform layer. the swift app posts input events from the main thread
++ * into a queue which the game thread drains in mudclient_poll_events(). the
++ * touch handling mirrors the SDL/android implementation in mudclient-sdl.c so
++ * the mobile controls behave the same as the android and web clients.
++ */
++
++#define EVENT_QUEUE_SIZE 1024
++
++typedef enum {
++    EVENT_TOUCH_DOWN,
++    EVENT_TOUCH_MOVE,
++    EVENT_TOUCH_UP,
++    EVENT_KEY,
++    EVENT_KEY_DOWN,
++    EVENT_KEY_UP,
++    EVENT_ADD_WORLD,
++    EVENT_REMOVE_WORLD
++} EventType;
++
++typedef struct {
++    char name[32];
++    char host[64];
++    int port;
++    char rsa_exponent[512];
++    char rsa_modulus[512];
++    char register_url[256];
++} PendingWorld;
++
++typedef struct {
++    EventType type;
++    intptr_t finger;
++    float x;
++    float y;
++    int code;
++    int char_code;
++    PendingWorld *world; /* EVENT_ADD_WORLD, freed by the game thread */
++} Event;
++
++static pthread_mutex_t event_lock = PTHREAD_MUTEX_INITIALIZER;
++static Event event_queue[EVENT_QUEUE_SIZE];
++static int event_head = 0;
++static int event_tail = 0;
++
++static int requested_width = MUD_WIDTH;
++static int requested_height = MUD_HEIGHT;
++static int requested_resize = 0;
++
++static pthread_mutex_t frame_lock = PTHREAD_MUTEX_INITIALIZER;
++static uint32_t *frame_pixels = NULL;
++static int frame_capacity = 0;
++static int frame_width = 0;
++static int frame_height = 0;
++static uint64_t frame_serial = 0;
++
++static RscConfig config = {0};
++static char cache_dir[PATH_MAX] = {0};
++static char config_dir[PATH_MAX] = {0};
++
++/* touch state, same as mudclient-sdl.c */
++static int mudclient_horizontal_drag = 0;
++static int mudclient_vertical_drag = 0;
++static double mudclient_pinch_distance = 0;
++static int mudclient_has_right_clicked = 0;
++static int mudclient_touch_start = 0; // ms
++static int mudclient_touch_start_x = 0;
++static int mudclient_touch_start_y = 0;
++static float mudclient_touch_last_y = 0; // normalized
++static intptr_t mudclient_finger_1_id = 0;
++static intptr_t mudclient_finger_2_id = 0;
++
++static void push_event(Event event) {
++    pthread_mutex_lock(&event_lock);
++
++    int next = (event_head + 1) % EVENT_QUEUE_SIZE;
++
++    /* drop input rather than block the UI if the game thread stalls */
++    if (next != event_tail) {
++        event_queue[event_head] = event;
++        event_head = next;
++    } else {
++        free(event.world);
++    }
++
++    pthread_mutex_unlock(&event_lock);
++}
++
++static int pop_event(Event *event) {
++    pthread_mutex_lock(&event_lock);
++
++    int has_event = event_head != event_tail;
++
++    if (has_event) {
++        *event = event_queue[event_tail];
++        event_tail = (event_tail + 1) % EVENT_QUEUE_SIZE;
++    }
++
++    pthread_mutex_unlock(&event_lock);
++
++    return has_event;
++}
++
++static void clamp_size(int *width, int *height) {
++    if (*width < MUD_MIN_WIDTH) {
++        *width = MUD_MIN_WIDTH;
++    }
++
++    if (*height < MUD_MIN_HEIGHT) {
++        *height = MUD_MIN_HEIGHT;
++    }
++}
++
++static void *game_thread(void *arg) {
++    (void)arg;
++
++    char *argv[] = {"mudclient", config.members ? "members" : "free", NULL};
++
++    mudclient_ios_main(2, argv);
++
++    return NULL;
++}
++
++void rsc_start(const RscConfig *new_config) {
++    config = *new_config;
++
++    snprintf(cache_dir, sizeof(cache_dir), "%s", new_config->cache_dir);
++    snprintf(config_dir, sizeof(config_dir), "%s", new_config->config_dir);
++
++    config.cache_dir = cache_dir;
++    config.config_dir = config_dir;
++
++    requested_width = new_config->width;
++    requested_height = new_config->height;
++    clamp_size(&requested_width, &requested_height);
++
++    pthread_attr_t attr;
++    pthread_attr_init(&attr);
++    /* the client keeps some large buffers on the stack */
++    pthread_attr_setstacksize(&attr, 16 * 1024 * 1024);
++    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
++
++    pthread_t thread;
++    pthread_create(&thread, &attr, game_thread, NULL);
++    pthread_attr_destroy(&attr);
++}
++
++void rsc_resize(int width, int height) {
++    clamp_size(&width, &height);
++
++    pthread_mutex_lock(&event_lock);
++    requested_width = width;
++    requested_height = height;
++    requested_resize = 1;
++    pthread_mutex_unlock(&event_lock);
++}
++
++void rsc_touch(RscTouchPhase phase, intptr_t finger, float x, float y) {
++    EventType type = EVENT_TOUCH_MOVE;
++
++    if (phase == RSC_TOUCH_DOWN) {
++        type = EVENT_TOUCH_DOWN;
++    } else if (phase == RSC_TOUCH_UP) {
++        type = EVENT_TOUCH_UP;
++    }
++
++    push_event((Event){.type = type, .finger = finger, .x = x, .y = y});
++}
++
++/* same as get_sdl_keycodes(): special keys only produce a character for
++ * enter, backspace and tab */
++static int get_char_code(int code) {
++    if (code == RSC_KEY_ENTER || code == RSC_KEY_BACKSPACE ||
++        code == RSC_KEY_TAB || (code < 127 && isprint(code))) {
++        return code;
++    }
++
++    return -1;
++}
++
++void rsc_key(RscKey key) {
++    push_event(
++        (Event){.type = EVENT_KEY, .code = key, .char_code = get_char_code(key)});
++}
++
++void rsc_key_down(int code) {
++    push_event((Event){
++        .type = EVENT_KEY_DOWN, .code = code, .char_code = get_char_code(code)});
++}
++
++void rsc_key_up(int code) {
++    push_event((Event){.type = EVENT_KEY_UP, .code = code});
++}
++
++void rsc_add_world(const char *name, const char *host, int port,
++                   const char *rsa_exponent, const char *rsa_modulus,
++                   const char *register_url) {
++    PendingWorld *world = calloc(1, sizeof(PendingWorld));
++
++    snprintf(world->name, sizeof(world->name), "%s", name);
++    snprintf(world->host, sizeof(world->host), "%s", host);
++    world->port = port;
++    snprintf(world->rsa_exponent, sizeof(world->rsa_exponent), "%s",
++             rsa_exponent);
++    snprintf(world->rsa_modulus, sizeof(world->rsa_modulus), "%s",
++             rsa_modulus);
++    snprintf(world->register_url, sizeof(world->register_url), "%s",
++             register_url != NULL ? register_url : "");
++
++    push_event((Event){.type = EVENT_ADD_WORLD, .world = world});
++}
++
++void rsc_remove_world(int index) {
++    push_event((Event){.type = EVENT_REMOVE_WORLD, .code = index});
++}
++
++void rsc_text(const char *text) {
++    for (const char *c = text; *c != '\0'; c++) {
++        if (isprint((unsigned char)*c)) {
++            push_event((Event){.type = EVENT_KEY, .code = *c, .char_code = *c});
++        }
++    }
++}
++
++uint64_t rsc_frame_lock(const uint32_t **pixels, int *width, int *height) {
++    pthread_mutex_lock(&frame_lock);
++
++    *pixels = frame_pixels;
++    *width = frame_width;
++    *height = frame_height;
++
++    return frame_serial;
++}
++
++void rsc_frame_unlock(void) { pthread_mutex_unlock(&frame_lock); }
++
++const char *mudclient_ios_cache_dir(void) { return cache_dir; }
++
++const char *mudclient_ios_config_dir(void) { return config_dir; }
++
++void mudclient_ios_get_game_size(int *width, int *height) {
++    pthread_mutex_lock(&event_lock);
++    *width = requested_width;
++    *height = requested_height;
++    pthread_mutex_unlock(&event_lock);
++}
++
++void mudclient_ios_show_keyboard(char *text, int is_password) {
++    if (config.on_keyboard != NULL) {
++        config.on_keyboard(config.context, text, is_password);
++    }
++}
++
++void mudclient_ios_play_sound(int16_t *pcm, int samples) {
++    if (config.on_sound != NULL) {
++        config.on_sound(config.context, pcm, samples, SAMPLE_RATE);
++    }
++}
++
++void mudclient_ios_open_url(char *url) {
++    if (config.on_open_url != NULL) {
++        config.on_open_url(config.context, url);
++    }
++}
++
++void mudclient_ios_request_world(void) {
++    if (config.on_request_world != NULL) {
++        config.on_request_world(config.context);
++    }
++}
++
++void mudclient_ios_request_remove_world(int index, char *name) {
++    if (config.on_request_remove_world != NULL) {
++        config.on_request_remove_world(config.context, index, name);
++    }
++}
++
++void mudclient_ios_register(char *world_name, char *url) {
++    if (config.on_register != NULL) {
++        config.on_register(config.context, world_name, url);
++    }
++}
++
++void mudclient_ios_present(int32_t *pixels, int width, int height) {
++    pthread_mutex_lock(&frame_lock);
++
++    int area = width * height;
++
++    if (area > frame_capacity) {
++        free(frame_pixels);
++        frame_pixels = malloc(area * sizeof(uint32_t));
++        frame_capacity = area;
++    }
++
++    memcpy(frame_pixels, pixels, area * sizeof(uint32_t));
++    frame_width = width;
++    frame_height = height;
++    frame_serial++;
++
++    pthread_mutex_unlock(&frame_lock);
++}
++
++void mudclient_start_application(mudclient *mud, char *title) {
++    (void)title;
++
++    /*
++     * the login screen backgrounds are rendered from the 3D scene once while
++     * loading and are drawn assuming they're 512 pixels wide, as the desktop
++     * client always starts at the vanilla size. do the same and switch to
++     * the real size as soon as loading finishes (the backgrounds are scaled
++     * or centred from then on).
++     */
++    mud->game_width = MUD_VANILLA_WIDTH;
++    mud->game_height = MUD_VANILLA_HEIGHT;
++
++    /* lay out again once loading finishes, which also applies the offsets
++     * that centre the login panels */
++    pthread_mutex_lock(&event_lock);
++    requested_resize = 1;
++    pthread_mutex_unlock(&event_lock);
++}
++
++static void handle_touch_down(mudclient *mud, Event *event) {
++    int touch_x = event->x * mud->game_width;
++    int touch_y = event->y * mud->game_height;
++
++    if (!mudclient_finger_1_down) {
++        mudclient_has_right_clicked = 0;
++
++        mudclient_finger_1_id = event->finger;
++        mudclient_finger_1_down = 1;
++
++        mudclient_finger_1_x = touch_x;
++        mudclient_finger_1_y = touch_y;
++
++        mudclient_touch_start = get_ticks();
++
++        mudclient_touch_start_x = touch_x;
++        mudclient_touch_start_y = touch_y;
++        mudclient_touch_last_y = event->y;
++
++        mudclient_mouse_moved(mud, touch_x, touch_y);
++    } else if (!mudclient_finger_2_down) {
++        mudclient_finger_2_id = event->finger;
++        mudclient_finger_2_down = 1;
++
++        mudclient_finger_2_x = touch_x;
++        mudclient_finger_2_y = touch_y;
++    }
++}
++
++static void handle_touch_move(mudclient *mud, Event *event) {
++    int touch_x = event->x * mud->game_width;
++    int touch_y = event->y * mud->game_height;
++
++    if (event->finger == mudclient_finger_1_id) {
++        mudclient_finger_1_x = touch_x;
++        mudclient_finger_1_y = touch_y;
++    } else if (event->finger == mudclient_finger_2_id) {
++        mudclient_finger_2_x = touch_x;
++        mudclient_finger_2_y = touch_y;
++    }
++
++    if (mud->options->touch_pinch != 0 && mudclient_finger_1_down &&
++        mudclient_finger_2_down) {
++        double pinch_distance =
++            distance(mudclient_finger_1_x, mudclient_finger_1_y,
++                     mudclient_finger_2_x, mudclient_finger_2_y);
++
++        if (mudclient_pinch_distance > 0) {
++            float scale = mud->options->touch_pinch / 100.0f;
++
++            mud->mouse_scroll_delta =
++                (mudclient_pinch_distance - pinch_distance) * scale;
++        }
++
++        mudclient_pinch_distance = pinch_distance;
++        mudclient_has_right_clicked = 1;
++    } else if (mudclient_finger_1_down && !mudclient_finger_2_down &&
++               event->finger == mudclient_finger_1_id) {
++        int delta_x = touch_x - mudclient_touch_start_x;
++        int delta_y = touch_y - mudclient_touch_start_y;
++
++        float dy = event->y - mudclient_touch_last_y;
++        mudclient_touch_last_y = event->y;
++
++        if (!mudclient_horizontal_drag && abs(delta_x) > 30) {
++            mudclient_horizontal_drag = 1;
++
++            mudclient_mouse_pressed(mud, mudclient_touch_start_x,
++                                    mudclient_touch_start_y, 2);
++        }
++
++        if (mud->options->touch_vertical_drag != 0 && mud->show_ui_tab == 0 &&
++            (mudclient_vertical_drag || abs(delta_y) > 30)) {
++            mudclient_vertical_drag = 1;
++
++            mud->mouse_scroll_delta =
++                (dy * (mud->options->touch_vertical_drag / 100.0f)) *
++                mud->game_height;
++        }
++
++        mudclient_mouse_moved(mud, touch_x, touch_y);
++    }
++}
++
++static void handle_touch_up(mudclient *mud, Event *event) {
++    int touch_x = event->x * mud->game_width;
++    int touch_y = event->y * mud->game_height;
++
++    if (mudclient_finger_1_down && event->finger == mudclient_finger_1_id) {
++        mudclient_finger_1_down = 0;
++
++        if (!mudclient_has_right_clicked && !mudclient_vertical_drag &&
++            !mudclient_horizontal_drag && mudclient_pinch_distance == 0) {
++            mudclient_mouse_pressed(mud, touch_x, touch_y, 0);
++            mudclient_mouse_released(mud, touch_x, touch_y, 0);
++        } else {
++            mudclient_vertical_drag = 0;
++
++            if (mudclient_horizontal_drag) {
++                mudclient_mouse_released(mud, mud->mouse_x, mud->mouse_y, 2);
++                mudclient_horizontal_drag = 0;
++            }
++        }
++    } else if (mudclient_finger_2_down &&
++               event->finger == mudclient_finger_2_id) {
++        mudclient_finger_2_down = 0;
++        mudclient_pinch_distance = 0;
++    }
++}
++
++void mudclient_poll_events(mudclient *mud) {
++    /* long press for right click */
++    if (!mudclient_has_right_clicked && !mudclient_horizontal_drag &&
++        !mudclient_vertical_drag && mudclient_finger_1_down &&
++        !mudclient_finger_2_down &&
++        get_ticks() - mudclient_touch_start >= mud->options->touch_menu_delay) {
++        mudclient_mouse_pressed(mud, mud->mouse_x, mud->mouse_y, 3);
++        mudclient_mouse_released(mud, mud->mouse_x, mud->mouse_y, 3);
++        mudclient_has_right_clicked = 1;
++    }
++
++    /* panels only exist once loading finishes */
++    if (mud->loading_step == 0) {
++        pthread_mutex_lock(&event_lock);
++        int should_resize = requested_resize;
++        requested_resize = 0;
++        pthread_mutex_unlock(&event_lock);
++
++        if (should_resize) {
++            mudclient_on_resize(mud);
++        }
++    }
++
++    Event event;
++
++    while (pop_event(&event)) {
++        switch (event.type) {
++        case EVENT_TOUCH_DOWN:
++            handle_touch_down(mud, &event);
++            break;
++        case EVENT_TOUCH_MOVE:
++            handle_touch_move(mud, &event);
++            break;
++        case EVENT_TOUCH_UP:
++            handle_touch_up(mud, &event);
++            break;
++        case EVENT_KEY:
++            mudclient_key_pressed(mud, event.code, event.char_code);
++            mudclient_key_released(mud, event.code);
++            break;
++        case EVENT_KEY_DOWN:
++            mudclient_key_pressed(mud, event.code, event.char_code);
++            break;
++        case EVENT_KEY_UP:
++            mudclient_key_released(mud, event.code);
++            break;
++        case EVENT_ADD_WORLD:
++            if (mud->panel_login_worldlist != NULL) {
++                worldlist_add(mud, event.world->name, event.world->host,
++                              event.world->port, event.world->rsa_exponent,
++                              event.world->rsa_modulus,
++                              event.world->register_url);
++            }
++
++            free(event.world);
++            break;
++        case EVENT_REMOVE_WORLD:
++            if (mud->panel_login_worldlist != NULL) {
++                worldlist_remove(mud, event.code);
++            }
++            break;
++        }
++    }
++}
++
++#endif
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/mudclient.c b/mudclient.c
+--- a/mudclient.c	2026-10-04 22:23:17
++++ b/mudclient.c	2026-10-04 23:13:58
+@@ -170,6 +170,13 @@
+ 
+ void mudclient_resize(mudclient *mud) {
+ #if !defined(WII) && !defined(_3DS)
++#ifdef IOS
++    if (mud->surface != NULL) {
++        free(mud->surface->pixels);
++
++        mud->surface->pixels =
++            calloc(mud->game_width * mud->game_height, sizeof(int32_t));
++#else
+     SDL_FreeSurface(mud->screen);
+     SDL_FreeSurface(mud->pixel_surface);
+ 
+@@ -197,6 +204,7 @@
+ #ifdef RENDER_SW
+         mud->surface->pixels = mud->pixel_surface->pixels;
+ #endif
++#endif /* IOS */
+ 
+ #ifdef RENDER_GL
+         free(mud->surface->pixels);
+@@ -960,6 +968,10 @@
+ #elif defined(_3DS) || defined(__SWITCH__)
+     char prefixed_file[PATH_MAX];
+     snprintf(prefixed_file, sizeof(prefixed_file), "romfs:/%s", file);
++#elif defined(IOS)
++    char prefixed_file[PATH_MAX];
++    snprintf(prefixed_file, sizeof(prefixed_file), "%s/%s",
++             mudclient_ios_cache_dir(), file);
+ #else
+     char prefixed_file[PATH_MAX];
+     snprintf(prefixed_file, sizeof(prefixed_file), "./cache/%s", file);
+@@ -5012,7 +5024,7 @@
+     int new_width = MUD_WIDTH;
+     int new_height = MUD_HEIGHT;
+ 
+-#if !defined(_3DS) && !defined(WII) && !defined(SDL12)
++#if !defined(_3DS) && !defined(WII) && !defined(SDL12) && !defined(IOS)
+ #ifdef RENDER_GL
+     SDL_Window *window = mud->gl_window;
+ #else
+@@ -5028,6 +5040,10 @@
+     SDL_GetWindowSize(window, &new_width, &new_height);
+ #endif
+ 
++#ifdef IOS
++    mudclient_ios_get_game_size(&new_width, &new_height);
++#endif
++
+ #ifdef ANDROID
+     mudclient_full_width = new_width;
+     mudclient_full_height = new_height;
+@@ -5085,7 +5101,7 @@
+ int mudclient_is_touch(mudclient *mud) {
+     (void)(mud);
+ 
+-#ifdef ANDROID
++#if defined(ANDROID) || defined(IOS)
+     return 1; // TODO maybe still make this toggleable
+ #elif defined(EMSCRIPTEN)
+     return browser_is_touch();
+@@ -5109,6 +5125,8 @@
+     (void)is_centred;
+ #ifdef ANDROID
+     SDL_StartTextInput();
++#elif defined(IOS)
++    mudclient_ios_show_keyboard(text, is_password);
+ #elif defined(EMSCRIPTEN)
+     int is_scaled = mudclient_is_ui_scaled(mud);
+ 
+@@ -5407,6 +5425,8 @@
+ #elif defined(_3DS)
+     mud->_3ds_sound_position = 0;
+     mud->_3ds_sound_length = length * 2;
++#elif defined(IOS)
++    mudclient_ios_play_sound(mud->pcm_out, length);
+ #elif defined(SDL_VERSION_ATLEAST)
+ #if SDL_VERSION_ATLEAST(2, 0, 4)
+     SDL_PauseAudio(0);
+@@ -5610,6 +5630,9 @@
+     char **argv;
+ 
+     argv = (char**)CommandLineToArgvW(GetCommandLineW(), &argc);
++#elif defined(IOS)
++/* the swift app owns main(); the game thread calls this instead */
++int mudclient_ios_main(int argc, char **argv) {
+ #else
+ int main(int argc, char **argv) {
+ #endif
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/mudclient.h b/mudclient.h
+--- a/mudclient.h	2026-10-04 22:23:17
++++ b/mudclient.h	2026-10-05 10:55:18
+@@ -66,7 +66,7 @@
+      GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+ #endif
+ 
+-#if !defined(WII) && !defined(_3DS)
++#if !defined(WII) && !defined(_3DS) && !defined(IOS)
+ #ifdef __SWITCH__
+ #include <SDL2/SDL.h>
+ #else
+@@ -382,6 +382,18 @@
+ void mudclient_3ds_gl_frame_start(mudclient *mud, int clear);
+ void mudclient_3ds_gl_frame_end();
+ #endif
++#elif defined(IOS)
++/* implemented in mudclient-ios.c */
++const char *mudclient_ios_cache_dir(void);
++void mudclient_ios_get_game_size(int *width, int *height);
++void mudclient_ios_show_keyboard(char *text, int is_password);
++void mudclient_ios_play_sound(int16_t *pcm, int samples);
++void mudclient_ios_open_url(char *url);
++void mudclient_ios_request_world(void);
++void mudclient_ios_request_remove_world(int index, char *name);
++void mudclient_ios_register(char *world_name, char *url);
++void mudclient_ios_present(int32_t *pixels, int width, int height);
++int mudclient_ios_main(int argc, char **argv);
+ #else
+ #ifdef SDL12
+ void get_sdl_keycodes(SDL_keysym *keysym, char *char_code, int *code);
+@@ -513,6 +525,8 @@
+     C3D_RenderTarget *_3ds_gl_render_target;
+     C3D_RenderTarget *_3ds_gl_offscreen_render_target;
+ #endif
++#elif defined(IOS)
++    /* platform state lives in mudclient-ios.c */
+ #else
+ #ifndef SDL12
+     SDL_Window *window;
+@@ -672,6 +686,7 @@
+     int control_welcome_existing_user;
+     int control_welcome_options;
+     int control_welcome_worlds;
++    int control_welcome_register;
+     int refer_id;
+     int control_login_new_ok;
+     int control_register_status;
+@@ -891,6 +906,8 @@
+     Panel *panel_login_worldlist;
+     int control_list_worlds;
+     int control_worldlist_button;
++    int control_worldlist_add;
++    int control_worldlist_remove;
+ 
+     /* ./ui/magic-tab.c */
+     Panel *panel_magic;
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/options.c b/options.c
+--- a/options.c	2026-10-04 22:23:17
++++ b/options.c	2026-10-05 12:52:37
+@@ -250,6 +250,7 @@
+             options->username,              //
+             options->password,              //
+             options->browser_command,       //
++            options->camera_mode_chosen,    //
+             options->diversify_npcs,        //
+             options->rename_herblaw_items,  //
+                                             //
+@@ -354,7 +355,10 @@
+     OPTION_INI_INT("remember_password", options->remember_password, 0, 1);
+     OPTION_INI_STR("username", options->username, 20);
+     OPTION_INI_STR("password", options->password, 20);
++    options->username[20] = '\0';
++    options->password[20] = '\0';
+     OPTION_INI_STR("browser_command", options->browser_command, 20);
++    OPTION_INI_INT("camera_mode_chosen", options->camera_mode_chosen, 0, 1);
+ #ifdef RENDER_SW
+     OPTION_INI_INT("diversify_npcs", options->diversify_npcs, 0, 1);
+ #else
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/options.h b/options.h
+--- a/options.h	2026-10-04 22:23:17
++++ b/options.h	2026-10-05 12:52:37
+@@ -45,6 +45,8 @@
+      "password = %s\n\n"                                                       \
+      "; System command to use to open the web browser (only on desktop)\n"     \
+      "browser_command = %s\n\n"                                                \
++     "; Camera angle mode was picked in game (otherwise default to manual)\n"  \
++     "camera_mode_chosen = %d\n\n"                                             \
+      "; Diversify NPCs sent by server (custom)\n"                              \
+      "diversify_npcs = %d\n\n"                                                 \
+      "; Rename Herblaw items for ease of identification (custom)\n"            \
+@@ -215,6 +217,10 @@
+     int remember_username;
+     int remember_password;
+ 
++    /* the player picked a camera angle mode in game. until they do, iOS
++     * switches the account to manual on login */
++    int camera_mode_chosen;
++
+     /* diversify NPCs sent by server (custom) */
+     int diversify_npcs;
+ 
+@@ -227,9 +233,10 @@
+     /* url to open wiki pages in */
+     char wiki_url[255];
+ 
+-    /* credentials if remember username/password is enabled */
+-    char username[20];
+-    char password[20];
++    /* credentials if remember username/password is enabled. both may be 20
++     * characters long (USERNAME_LENGTH/PASSWORD_LENGTH), plus the null */
++    char username[21];
++    char password[21];
+ 
+     /* scroll panel lists, chatbox, and camera (if zoom enabled) with wheel */
+     int mouse_wheel;
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/packet-handler.c b/packet-handler.c
+--- a/packet-handler.c	2026-10-04 22:23:17
++++ b/packet-handler.c	2026-10-05 12:52:37
+@@ -1917,6 +1917,19 @@
+         mud->settings_camera_auto = get_unsigned_byte(data, 1, size);
+         mud->settings_mouse_button_one = get_unsigned_byte(data, 2, size);
+         mud->settings_sound_disabled = get_unsigned_byte(data, 3, size);
++
++#ifdef IOS
++        /* default to manual camera on touch screens (dragging rotates it)
++         * unless the player has picked a mode in game */
++        if (mud->settings_camera_auto && !mud->options->camera_mode_chosen) {
++            mud->settings_camera_auto = 0;
++
++            packet_stream_new_packet(mud->packet_stream, CLIENT_SETTINGS_GAME);
++            packet_stream_put_byte(mud->packet_stream, 0);
++            packet_stream_put_byte(mud->packet_stream, 0);
++            packet_stream_send_packet(mud->packet_stream);
++        }
++#endif
+         break;
+     }
+     case SERVER_PRIVACY_SETTINGS: {
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/rsc-bridge.h b/rsc-bridge.h
+--- a/rsc-bridge.h	1969-12-31 18:00:00
++++ b/rsc-bridge.h	2026-10-05 10:56:00
+@@ -0,0 +1,117 @@
++#ifndef _H_RSC_BRIDGE
++#define _H_RSC_BRIDGE
++
++/*
++ * the C API the swift app uses to drive the rsc-c core. everything here is
++ * safe to call from the main thread; the game itself runs on its own thread
++ * started by rsc_start().
++ */
++
++#include <stdint.h>
++
++typedef enum {
++    RSC_TOUCH_DOWN = 0,
++    RSC_TOUCH_MOVE = 1,
++    RSC_TOUCH_UP = 2
++} RscTouchPhase;
++
++/* subset of the K_* codes in mudclient.h */
++typedef enum {
++    RSC_KEY_BACKSPACE = 8,
++    RSC_KEY_TAB = 9,
++    RSC_KEY_ENTER = 13,
++    RSC_KEY_ESCAPE = 27,
++    RSC_KEY_PAGE_UP = 33,
++    RSC_KEY_PAGE_DOWN = 34,
++    RSC_KEY_HOME = 36,
++    RSC_KEY_LEFT = 37,
++    RSC_KEY_UP = 38,
++    RSC_KEY_RIGHT = 39,
++    RSC_KEY_DOWN = 40,
++    RSC_KEY_F1 = 112
++} RscKey;
++
++/* called on the game thread when a text field is focused in-game */
++typedef void (*RscKeyboardCallback)(void *context, const char *text,
++                                    int is_password);
++
++/* called on the game thread, e.g. for wiki lookups */
++typedef void (*RscOpenURLCallback)(void *context, const char *url);
++
++/* called on the game thread when "Add world" is tapped */
++typedef void (*RscRequestWorldCallback)(void *context);
++
++/* called on the game thread when "Remove" is tapped on the world list. call
++ * rsc_remove_world(index) to confirm */
++typedef void (*RscRequestRemoveWorldCallback)(void *context, int index,
++                                              const char *name);
++
++/* called on the game thread when "Register" is tapped. url is empty when the
++ * selected world has no registration page */
++typedef void (*RscRegisterCallback)(void *context, const char *world_name,
++                                    const char *url);
++
++/* called on the game thread with signed 16-bit mono PCM */
++typedef void (*RscSoundCallback)(void *context, const int16_t *pcm,
++                                 int samples, int sample_rate);
++
++typedef struct {
++    /* directory containing config85.jag, media59.jag etc. */
++    const char *cache_dir;
++    /* writable directory for options.ini and worlds.cfg */
++    const char *config_dir;
++    /* initial game resolution in pixels */
++    int width;
++    int height;
++    int members;
++
++    void *context;
++    RscKeyboardCallback on_keyboard;
++    RscSoundCallback on_sound;
++    RscOpenURLCallback on_open_url;
++    RscRequestWorldCallback on_request_world;
++    RscRequestRemoveWorldCallback on_request_remove_world;
++    RscRegisterCallback on_register;
++} RscConfig;
++
++/* start the game thread. may only be called once */
++void rsc_start(const RscConfig *config);
++
++/* request a new game resolution (e.g. after rotation) */
++void rsc_resize(int width, int height);
++
++/* x and y are normalized to 0..1 across the game view */
++void rsc_touch(RscTouchPhase phase, intptr_t finger, float x, float y);
++
++/* press and release a special key */
++void rsc_key(RscKey key);
++
++/* hold and release a key, e.g. arrow keys from a hardware keyboard */
++void rsc_key_down(int code);
++void rsc_key_up(int code);
++
++/*
++ * add a world to the login screen's world list and select it. the RSA
++ * exponent and modulus are hex, 0-padded to a multiple of 8 characters.
++ * register_url may be NULL or empty
++ */
++void rsc_add_world(const char *name, const char *host, int port,
++                   const char *rsa_exponent, const char *rsa_modulus,
++                   const char *register_url);
++
++/* remove a world from the world list (the last one is always kept) */
++void rsc_remove_world(int index);
++
++/* type printable ASCII text */
++void rsc_text(const char *text);
++
++/*
++ * borrow the most recently presented frame. pixels are 0x00RRGGBB, which is
++ * BGRA byte order on little endian. returns a serial number that increases
++ * with every new frame, or 0 if nothing has been drawn yet. must be paired
++ * with rsc_frame_unlock().
++ */
++uint64_t rsc_frame_lock(const uint32_t **pixels, int *width, int *height);
++void rsc_frame_unlock(void);
++
++#endif
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/surface.c b/surface.c
+--- a/surface.c	2026-10-04 22:23:17
++++ b/surface.c	2026-10-04 23:14:14
+@@ -121,7 +121,7 @@
+     surface->bounds_max_y = height;
+ 
+ #ifdef RENDER_SW
+-#if (defined(WII) || defined(_3DS))
++#if (defined(WII) || defined(_3DS) || defined(IOS))
+     surface->pixels = calloc(width * height, sizeof(int32_t));
+ #else
+     surface->pixels = mud->pixel_surface->pixels;
+@@ -247,6 +247,8 @@
+ 
+     gspWaitForVBlank();
+ #endif
++#elif defined(IOS)
++    mudclient_ios_present(surface->pixels, surface->width, surface->height);
+ #else
+ #ifdef SDL12
+     SDL_BlitSurface(mud->pixel_surface, NULL, mud->screen, NULL);
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/confirm.c b/ui/confirm.c
+--- a/ui/confirm.c	2026-10-04 22:23:17
++++ b/ui/confirm.c	2026-10-04 23:13:13
+@@ -86,7 +86,7 @@
+             options_set_vanilla(mud->options);
+             mudclient_sync_options_panels(mud);
+ 
+-#if !defined(WII) && !defined(_3DS)
++#if !defined(WII) && !defined(_3DS) && !defined(IOS)
+ #ifdef RENDER_SW
+ #ifndef SDL12
+             SDL_RestoreWindow(mud->window);
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/login.c b/ui/login.c
+--- a/ui/login.c	2026-10-04 22:23:17
++++ b/ui/login.c	2026-10-05 11:08:19
+@@ -20,7 +20,58 @@
+     int show_registration =
+         !mud->options->members || mud->options->registration;
+ 
+-    if (show_registration) {
++    /* on touch screens stack the welcome buttons as equally sized buttons
++     * instead of squeezing small ones into the corner */
++    int stack_buttons = is_touch && !show_registration;
++
++    mud->control_welcome_register = -1;
++
++    if (stack_buttons) {
++        int stack_height = is_compact ? 22 : 24;
++        int stack_spacing = stack_height + (is_compact ? 3 : 4);
++        int stack_width = is_compact ? 180 : 200;
++        int text_y = login_background_height + (is_compact ? 22 : 18);
++        int button_y = login_background_height + (is_compact ? 46 : 40);
++
++        panel_add_text_centre(mud->panel_login_welcome, x, text_y,
++                              "Welcome to RuneScape",
++                              is_compact ? FONT_BOLD_13 : FONT_BOLD_14, 1);
++
++        char *labels[4];
++        int *controls[4];
++        int count = 0;
++
++        labels[count] = "Login";
++        controls[count++] = &mud->control_welcome_existing_user;
++
++#ifdef IOS
++        /* opens the selected world's account creation page */
++        labels[count] = "Register";
++        controls[count++] = &mud->control_welcome_register;
++#endif
++
++        if (mud->options->show_additional_options) {
++            labels[count] = "Worlds";
++            controls[count++] = &mud->control_welcome_worlds;
++
++            labels[count] = "Options";
++            controls[count++] = &mud->control_welcome_options;
++        }
++
++        for (int i = 0; i < count; i++) {
++            panel_add_button_background(mud->panel_login_welcome, x, button_y,
++                                        stack_width, stack_height);
++
++            panel_add_text_centre(mud->panel_login_welcome, x, button_y,
++                                  labels[i], FONT_BOLD_16, 0);
++
++            *controls[i] =
++                panel_add_button(mud->panel_login_welcome, x, button_y,
++                                 stack_width, stack_height);
++
++            button_y += stack_spacing;
++        }
++    } else if (show_registration) {
+         int offset_x = is_compact ? 16 : 0;
+ 
+         panel_add_text_centre(
+@@ -83,7 +134,7 @@
+             button_width, 35);
+     }
+ 
+-    if (mud->options->show_additional_options) {
++    if (mud->options->show_additional_options && !stack_buttons) {
+         int button_x = (is_compact ? MUD_MIN_WIDTH : MUD_VANILLA_WIDTH) - 36;
+ 
+         int button_y =
+@@ -964,6 +1015,12 @@
+         } else if (panel_is_clicked(mud->panel_login_welcome,
+                                     mud->control_welcome_worlds)) {
+             mud->login_screen = LOGIN_STAGE_WORLD;
++#ifdef IOS
++        } else if (mud->control_welcome_register >= 0 &&
++                   panel_is_clicked(mud->panel_login_welcome,
++                                    mud->control_welcome_register)) {
++            worldlist_register(mud);
++#endif
+         }
+         return;
+     case LOGIN_STAGE_NEW:
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/menu.c b/ui/menu.c
+--- a/ui/menu.c	2026-10-04 22:23:17
++++ b/ui/menu.c	2026-10-04 23:16:57
+@@ -505,6 +505,8 @@
+                 window.open(url, '_blank');
+             },
+             encoded_url);
++#elif defined(IOS)
++        mudclient_ios_open_url(encoded_url);
+ #else
+         char formatted_command[256];
+ 
+@@ -586,7 +588,7 @@
+ 
+     char menu_text[256] = {0};
+ 
+-#if !defined(WII) && !defined(_3DS)
++#if !defined(WII) && !defined(_3DS) && !defined(IOS)
+     if ((index == -1 || !mud->selected_wiki) && mud->is_hand_cursor) {
+         SDL_SetCursor(mud->default_cursor);
+         mud->is_hand_cursor = 0;
+@@ -606,7 +608,7 @@
+                  mud->menu_items[mud->menu_indices[0]].action_text,
+                  mud->menu_items[mud->menu_indices[0]].target_text);
+     } else if (index != -1) {
+-#if !defined(WII) && !defined(_3DS)
++#if !defined(WII) && !defined(_3DS) && !defined(IOS)
+         if (mud->selected_wiki && !mud->is_hand_cursor) {
+             SDL_SetCursor(mud->hand_cursor);
+             mud->is_hand_cursor = 1;
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/message-tabs.c b/ui/message-tabs.c
+--- a/ui/message-tabs.c	2026-10-04 22:23:17
++++ b/ui/message-tabs.c	2026-10-05 13:48:08
+@@ -189,6 +189,21 @@
+     }
+ }
+ 
++/* the on-screen keyboard button used on touch screens. drawing and tapping
++ * must use the same position (they used to disagree when it was on the
++ * right, so the visible button did nothing) */
++void mudclient_get_keyboard_button_position(mudclient *mud, int *x, int *y) {
++    /* default to left */
++    *x = 9;
++    *y = 108;
++
++    if (mud->options->touch_keyboard_right) {
++        /* just above the ui tab icons */
++        *x = mud->surface->width - 50;
++        *y = mud->surface->height - 265;
++    }
++}
++
+ void mudclient_draw_chat_message_tabs_panel(mudclient *mud) {
+     int is_touch = mudclient_is_touch(mud);
+ 
+@@ -223,14 +238,11 @@
+     panel_text_list_entry_height_mod = 0;
+ 
+     if (is_touch) {
+-        /* default to left */
+-        int keyboard_button_x = 9;
+-        int keyboard_button_y = 108;
++        int keyboard_button_x = 0;
++        int keyboard_button_y = 0;
+ 
+-        if (mud->options->touch_keyboard_right) {
+-            keyboard_button_x = mud->surface->width - 50;
+-            keyboard_button_y = mud->surface->height - 265;
+-        }
++        mudclient_get_keyboard_button_position(mud, &keyboard_button_x,
++                                               &keyboard_button_y);
+ 
+         surface_draw_sprite(mud->surface, keyboard_button_x, keyboard_button_y,
+                             mud->sprite_media + 40);
+@@ -314,14 +326,11 @@
+     }
+ 
+     if (mudclient_is_touch(mud)) {
+-        /* default to left */
+-        int keyboard_button_x = 9;
+-        int keyboard_button_y = 108;
++        int keyboard_button_x = 0;
++        int keyboard_button_y = 0;
+ 
+-        if (mud->options->touch_keyboard_right) {
+-            keyboard_button_x = mud->surface->width - 50;
+-            keyboard_button_y = 100;
+-        }
++        mudclient_get_keyboard_button_position(mud, &keyboard_button_x,
++                                               &keyboard_button_y);
+ 
+         panel_handle_mouse(mud->panel_message_tabs, mudclient_finger_1_x,
+                            mudclient_finger_1_y, mud->last_mouse_button_down,
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/message-tabs.h b/ui/message-tabs.h
+--- a/ui/message-tabs.h	2026-10-04 22:23:17
++++ b/ui/message-tabs.h	2026-10-05 13:48:08
+@@ -35,6 +35,7 @@
+ void mudclient_send_command_string(mudclient *mud, char *command);
+ void mudclient_send_chat_message(mudclient *mud, int8_t *encoded,
+                                  int encoded_length);
++void mudclient_get_keyboard_button_position(mudclient *mud, int *x, int *y);
+ void mudclient_handle_message_tabs_input(mudclient *mud);
+ void mudclient_decrement_message_flash(mudclient *mud);
+ void mudclient_show_message(mudclient *mud, char *message, MessageType type);
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/options-tab.c b/ui/options-tab.c
+--- a/ui/options-tab.c	2026-10-04 22:23:17
++++ b/ui/options-tab.c	2026-10-05 12:52:37
+@@ -513,6 +513,15 @@
+             mud->mouse_y > y - 12 && mud->mouse_y < y + 4 &&
+             mud->mouse_button_click == 1) {
+             mud->settings_camera_auto = !mud->settings_camera_auto;
++
++#ifdef IOS
++            /* stop defaulting to manual once the player picks a mode */
++            if (!mud->options->camera_mode_chosen) {
++                mud->options->camera_mode_chosen = 1;
++                options_save(mud->options);
++            }
++#endif
++
+             packet_stream_new_packet(mud->packet_stream, CLIENT_SETTINGS_GAME);
+             packet_stream_put_byte(mud->packet_stream, 0);
+ 
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/worldlist.c b/ui/worldlist.c
+--- a/ui/worldlist.c	2026-10-04 22:23:17
++++ b/ui/worldlist.c	2026-10-05 14:01:43
+@@ -1,4 +1,5 @@
+ #include "worldlist.h"
++#include <assert.h>
+ #include <stdio.h>
+ 
+ #ifdef EMSCRIPTEN
+@@ -7,40 +8,91 @@
+ #define USE_WEBSOCKS 0
+ #endif
+ 
++#define WORLDLIST_MAX 256
++
+ struct server_type {
+     char name[32];
+     char host[64];
+     int port;
+     char rsa_exponent[512];
+     char rsa_modulus[512];
++    /* account creation page, may be empty */
++    char register_url[256];
+ };
+ 
+-static struct server_type list[256] = {0};
++static struct server_type list[WORLDLIST_MAX] = {0};
+ 
+ static void worldlist_set_defaults(void);
++static void worldlist_write(void);
+ static void worldlist_read_presets(struct mudclient *mud);
++static void worldlist_populate(mudclient *mud);
+ static void worldlist_select(mudclient *, int);
++static const char *worldlist_known_register_url(const char *host);
+ 
+ static void worldlist_set_defaults(void) {
+-    strcpy(list[0].name, "OpenRSC_Preservation");
++    memset(list, 0, sizeof(list));
++
++    strcpy(list[0].name, "RSC_Preservation");
+     strcpy(list[0].host, "game.openrsc.com");
+     list[0].port = USE_WEBSOCKS ? 43496 : 43596; /* websockets */
+     strcpy(list[0].rsa_exponent, "00010001");
+     strcpy(list[0].rsa_modulus, "87cef754966ecb19806238d9fecf0f421e816976f74f365c86a584e51049794d41fefbdc5fed3a3ed3b7495ba24262bb7d1dd5d2ff9e306b5bbf5522a2e85b25");
++    strcpy(list[0].register_url, worldlist_known_register_url(list[0].host));
+ 
+-    strcpy(list[1].name, "OpenRSC_Uranium");
+-    strcpy(list[1].host, "game.openrsc.com");
+-    list[1].port = USE_WEBSOCKS ? 43435 : 43235;
++    strcpy(list[1].name, "Neat_F2P");
++    strcpy(list[1].host, "192.3.118.9");
++    list[1].port = USE_WEBSOCKS ? 43494 : 43594;
+     strcpy(list[1].rsa_exponent, "00010001");
+-    strcpy(list[1].rsa_modulus, "87cef754966ecb19806238d9fecf0f421e816976f74f365c86a584e51049794d41fefbdc5fed3a3ed3b7495ba24262bb7d1dd5d2ff9e306b5bbf5522a2e85b25");
++    strcpy(list[1].rsa_modulus, "86b03ac30518bdb3e508ca9660efc7738a73ee7dbedbcebf8c56d030a2bdae70503c60829b7fb5eceb529442234c21bce6d529c8da4fce870e83ceffc379e281");
++    strcpy(list[1].register_url, worldlist_known_register_url(list[1].host));
++}
+ 
+-    strcpy(list[2].name, "Neat_F2P");
+-    strcpy(list[2].host, "192.3.118.9");
+-    list[2].port = USE_WEBSOCKS ? 43494 : 43594;
+-    strcpy(list[2].rsa_exponent, "00010001");
+-    strcpy(list[2].rsa_modulus, "86b03ac30518bdb3e508ca9660efc7738a73ee7dbedbcebf8c56d030a2bdae70503c60829b7fb5eceb529442234c21bce6d529c8da4fce870e83ceffc379e281");
++/* registration pages for servers we know about, so worlds saved without one
++ * (or added from an rscplus .ini, which has no such field) still get it */
++static const char *worldlist_known_register_url(const char *host) {
++    if (strcmp(host, "game.openrsc.com") == 0) {
++        return "https://rsc.vet/register";
++    }
++
++    if (strcmp(host, "192.3.118.9") == 0) {
++        return "https://www.neatf2p.com/account/create";
++    }
++
++    return "";
+ }
+ 
++/* names are shown with spaces but stored with underscores, since the file is
++ * whitespace separated */
++static void worldlist_write(void) {
++    char path[PATH_MAX];
++
++    get_config_path("worlds.cfg", path);
++
++    FILE *file = fopen(path, "w");
++
++    if (file == NULL) {
++        return;
++    }
++
++    for (int i = 0; list[i].name[0] != '\0'; ++i) {
++        char name[sizeof(list[i].name)];
++        strcpy(name, list[i].name);
++
++        for (int j = 0; name[j] != '\0'; ++j) {
++            if (name[j] == ' ') {
++                name[j] = '_';
++            }
++        }
++
++        /* the register url is an optional sixth field, "-" when unset */
++        fprintf(file, "%s %s %d %s %s %s\n", name, list[i].host,
++                list[i].port, list[i].rsa_exponent, list[i].rsa_modulus,
++                list[i].register_url[0] != '\0' ? list[i].register_url : "-");
++    }
++
++    fclose(file);
++}
++
+ static void worldlist_read_presets(struct mudclient *mud) {
+     char path[PATH_MAX];
+     int num = 0;
+@@ -52,29 +104,78 @@
+     FILE *file = fopen(path, "r");
+     if (file == NULL) {
+         worldlist_set_defaults();
+-        file = fopen(path, "w");
+-        if (file != NULL) {
+-            for (int i = 0; list[i].name[0] != '\0'; ++i) {
+-                fprintf(file, "%s %s %d %s %s\n",
+-                    list[i].name, list[i].host, list[i].port,
+-                    list[i].rsa_exponent, list[i].rsa_modulus);
+-            }
+-            fclose(file);
+-        }
++        worldlist_write();
+         return;
+     }
+-    for (;;) {
+-        int res = fscanf(file, "%30s %60s %d %500s %500s\n",
+-            list[num].name, list[num].host, &list[num].port,
+-            list[num].rsa_exponent, list[num].rsa_modulus);
+-        if (res <= 0) {
+-            break;
++
++    memset(list, 0, sizeof(list));
++
++    char line[1536];
++
++    while (num < WORLDLIST_MAX - 1 && fgets(line, sizeof(line), file)) {
++        struct server_type *world = &list[num];
++
++        int res = sscanf(line, "%30s %60s %d %500s %500s %255s", world->name,
++                         world->host, &world->port, world->rsa_exponent,
++                         world->rsa_modulus, world->register_url);
++
++        if (res < 5) {
++            memset(world, 0, sizeof(*world));
++            continue;
+         }
++
++        if (res < 6 || strcmp(world->register_url, "-") == 0) {
++            strcpy(world->register_url,
++                   worldlist_known_register_url(world->host));
++        }
++
+         num++;
+     }
+     fclose(file);
++
++    /* replace the untouched defaults from older builds, which included
++     * OpenRSC Uranium, with the current ones */
++    if (num == 3 && strcmp(list[0].name, "OpenRSC_Preservation") == 0 &&
++        strcmp(list[1].name, "OpenRSC_Uranium") == 0 &&
++        strcmp(list[2].name, "Neat_F2P") == 0) {
++        worldlist_set_defaults();
++        worldlist_write();
++        return;
++    }
++
++    /* the world is officially called "RSC Preservation" (formerly OpenRSC);
++     * rename the entry older builds saved */
++    int renamed = 0;
++
++    for (int i = 0; i < num; i++) {
++        if (strcmp(list[i].name, "OpenRSC_Preservation") == 0 &&
++            strcmp(list[i].host, "game.openrsc.com") == 0 &&
++            list[i].port == 43596) {
++            strcpy(list[i].name, "RSC_Preservation");
++            renamed = 1;
++        }
++    }
++
++    if (renamed) {
++        worldlist_write();
++    }
+ }
+ 
++static void worldlist_populate(mudclient *mud) {
++    panel_clear_list(mud->panel_login_worldlist, mud->control_list_worlds);
++
++    for (int i = 0; list[i].name[0] != '\0'; ++i) {
++        for (int j = 0; list[i].name[j] != '\0'; ++j) {
++            if (list[i].name[j] == '_') {
++                list[i].name[j] = ' ';
++            }
++        }
++        panel_add_list_entry(mud->panel_login_worldlist,
++                             mud->control_list_worlds, i,
++                             list[i].name);
++    }
++}
++
+ void worldlist_new(mudclient *mud) {
+     int is_compact = mud->surface->width < MUD_VANILLA_WIDTH ||
+                      mud->surface->height < MUD_VANILLA_HEIGHT;
+@@ -86,7 +187,7 @@
+ 
+     mud->panel_login_worldlist = malloc(sizeof(Panel));
+     assert(mud->panel_login_worldlist != NULL);
+-    panel_new(mud->panel_login_worldlist, mud->surface, 10);
++    panel_new(mud->panel_login_worldlist, mud->surface, 20);
+ 
+     panel_add_text_centre(
+         mud->panel_login_worldlist, x, y, "Select a world:", FONT_BOLD_12, 1);
+@@ -105,23 +206,47 @@
+     mud->control_worldlist_button = panel_add_button(
+         mud->panel_login_worldlist, button_x, button_y, 60, 20);
+ 
++#ifdef IOS
++    /* opens the native sheet to import or enter a world */
++    int add_x = button_x - 70;
++
++    panel_add_button_background(mud->panel_login_worldlist, add_x, button_y,
++                                76, 20);
++    panel_add_text_centre(mud->panel_login_worldlist, add_x, button_y,
++                          "Add world", FONT_BOLD_12, 0);
++
++    mud->control_worldlist_add = panel_add_button(
++        mud->panel_login_worldlist, add_x, button_y, 76, 20);
++
++    /* removes the selected world after a native confirmation */
++    int remove_x = add_x - 72;
++
++    panel_add_button_background(mud->panel_login_worldlist, remove_x,
++                                button_y, 64, 20);
++    panel_add_text_centre(mud->panel_login_worldlist, remove_x, button_y,
++                          "Remove", FONT_BOLD_12, 0);
++
++    mud->control_worldlist_remove = panel_add_button(
++        mud->panel_login_worldlist, remove_x, button_y, 64, 20);
++#endif
++
++#ifdef IOS
++    /* stop above the buttons so tapping one can't also select a world */
++    int list_height = button_y - 14 - y;
++#else
++    int list_height = 170;
++#endif
++
+     mud->control_list_worlds = panel_add_text_list_interactive(
+-        mud->panel_login_worldlist, x - 150, y, 250, 170, FONT_REGULAR_11, 256, 1);
++        mud->panel_login_worldlist, x - 150, y, 250, list_height,
++        FONT_REGULAR_11, 256, 1);
+     worldlist_read_presets(mud);
++    worldlist_populate(mud);
+ 
+-
+     int world_count = 0;
+ 
+-    for (int i = 0; list[i].name[0] != '\0'; ++i) {
++    while (list[world_count].name[0] != '\0') {
+         world_count++;
+-        for (int j = 0; list[i].name[j] != '\0'; ++j) {
+-            if (list[i].name[j] == '_') {
+-                list[i].name[j] = ' ';
+-            }
+-        }
+-        panel_add_list_entry(mud->panel_login_worldlist,
+-                             mud->control_list_worlds, i,
+-                             list[i].name);
+     }
+ 
+     if (mud->server[0] == '\0') {
+@@ -133,6 +258,16 @@
+             printf("would have been %d\n", mud->options->last_world);
+             worldlist_select(mud, 0);
+         }
++    } else {
++        /* keep the highlight on the selected world after a resize */
++        for (int i = 0; i < world_count; i++) {
++            if (strcmp(list[i].host, mud->server) == 0 &&
++                list[i].port == mud->port) {
++                mud->panel_login_worldlist
++                    ->control_activated[mud->control_list_worlds] = i;
++                break;
++            }
++        }
+     }
+ }
+ 
+@@ -146,6 +281,88 @@
+     mud->panel_login_worldlist->control_activated[mud->control_list_worlds] = index;
+ }
+ 
++void worldlist_add(mudclient *mud, const char *name, const char *host,
++                   int port, const char *rsa_exponent,
++                   const char *rsa_modulus, const char *register_url) {
++    int index = 0;
++
++    while (index < WORLDLIST_MAX - 1 && list[index].name[0] != '\0') {
++        index++;
++    }
++
++    if (index >= WORLDLIST_MAX - 1) {
++        return;
++    }
++
++    snprintf(list[index].name, sizeof(list[index].name), "%s", name);
++    snprintf(list[index].host, sizeof(list[index].host), "%s", host);
++    list[index].port = port;
++    snprintf(list[index].rsa_exponent, sizeof(list[index].rsa_exponent), "%s",
++             rsa_exponent);
++    snprintf(list[index].rsa_modulus, sizeof(list[index].rsa_modulus), "%s",
++             rsa_modulus);
++
++    if (register_url != NULL && register_url[0] != '\0') {
++        snprintf(list[index].register_url, sizeof(list[index].register_url),
++                 "%s", register_url);
++    } else {
++        strcpy(list[index].register_url,
++               worldlist_known_register_url(list[index].host));
++    }
++
++    worldlist_write();
++    worldlist_populate(mud);
++    worldlist_select(mud, index);
++}
++
++static int worldlist_count(void) {
++    int count = 0;
++
++    while (count < WORLDLIST_MAX && list[count].name[0] != '\0') {
++        count++;
++    }
++
++    return count;
++}
++
++void worldlist_remove(mudclient *mud, int index) {
++    int count = worldlist_count();
++
++    /* always keep one world to connect to */
++    if (index < 0 || index >= count || count <= 1) {
++        return;
++    }
++
++    int selected = mud->options->last_world;
++
++    memmove(&list[index], &list[index + 1],
++            (count - index - 1) * sizeof(struct server_type));
++    memset(&list[count - 1], 0, sizeof(struct server_type));
++
++    worldlist_write();
++    worldlist_populate(mud);
++
++    if (selected > index) {
++        selected--;
++    } else if (selected == index) {
++        selected = 0;
++    }
++
++    worldlist_select(mud, selected);
++}
++
++#ifdef IOS
++void worldlist_register(mudclient *mud) {
++    int index = mud->options->last_world;
++
++    if (index < 0 || index >= worldlist_count()) {
++        index = 0;
++    }
++
++    mudclient_ios_register(list[index].name, list[index].register_url);
++}
++#endif
++
+ void worldlist_handle_mouse(mudclient *mud) {
+     panel_handle_mouse(mud->panel_login_worldlist, mud->mouse_x,
+                            mud->mouse_y, mud->last_mouse_button_down,
+@@ -161,5 +378,19 @@
+     } else if (panel_is_clicked(mud->panel_login_worldlist,
+                                mud->control_worldlist_button)) {
+         mud->login_screen = 0;
++#ifdef IOS
++    } else if (panel_is_clicked(mud->panel_login_worldlist,
++                               mud->control_worldlist_add)) {
++        mudclient_ios_request_world();
++    } else if (panel_is_clicked(mud->panel_login_worldlist,
++                               mud->control_worldlist_remove)) {
++        int index = mud->options->last_world;
++
++        if (worldlist_count() <= 1) {
++            /* nothing to fall back to */
++        } else if (index >= 0 && index < worldlist_count()) {
++            mudclient_ios_request_remove_world(index, list[index].name);
++        }
++#endif
+     }
+ }
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/worldlist.h b/ui/worldlist.h
+--- a/ui/worldlist.h	2026-10-04 22:23:17
++++ b/ui/worldlist.h	2026-10-05 10:55:18
+@@ -5,4 +5,11 @@
+ 
+ void worldlist_new(mudclient *mud);
+ void worldlist_handle_mouse(mudclient *mud);
++void worldlist_add(mudclient *mud, const char *name, const char *host,
++                   int port, const char *rsa_exponent,
++                   const char *rsa_modulus, const char *register_url);
++void worldlist_remove(mudclient *mud, int index);
++#ifdef IOS
++void worldlist_register(mudclient *mud);
++#endif
+ #endif
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/utility.c b/utility.c
+--- a/utility.c	2026-10-04 22:23:17
++++ b/utility.c	2026-10-04 23:14:20
+@@ -45,6 +45,8 @@
+     char *pref_path = SDL_GetPrefPath("scape2003", "mudclient");
+     snprintf(path, PATH_MAX, "%s%s", pref_path, file);
+     SDL_free(pref_path);
++#elif defined(IOS)
++    snprintf(path, PATH_MAX, "%s/%s", mudclient_ios_config_dir(), file);
+ #elif defined(EMSCRIPTEN)
+     snprintf(path, PATH_MAX, "/" CLIENT_CONFIG_NAME  "options/%s", file);
+ #elif defined(OPTIONS_UNIX)
+@@ -133,7 +135,7 @@
+     va_list args = {0};
+     va_start(args, format);
+ 
+-#if !defined(_3DS) && !defined(WII) && !defined(SDL12)
++#if !defined(_3DS) && !defined(WII) && !defined(SDL12) && !defined(IOS)
+     SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, format,
+                     args);
+ #else
+@@ -147,7 +149,7 @@
+     va_list args = {0};
+     va_start(args, format);
+ 
+-#if !defined(_3DS) && !defined(WII) && !defined(SDL12)
++#if !defined(_3DS) && !defined(WII) && !defined(SDL12) && !defined(IOS)
+     SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR,
+                     format, args);
+ #else
+@@ -641,10 +643,24 @@
+ }
+ 
+ int get_ticks(void) {
+-#if !defined(WII) && !defined(_3DS)
++#if !defined(WII) && !defined(_3DS) && !defined(IOS)
+     return SDL_GetTicks();
+ #endif
+ 
++#ifdef IOS
++    static struct timespec start = {0};
++    struct timespec now;
++
++    clock_gettime(CLOCK_MONOTONIC, &now);
++
++    if (start.tv_sec == 0 && start.tv_nsec == 0) {
++        start = now;
++    }
++
++    return (int)((now.tv_sec - start.tv_sec) * 1000 +
++                 (now.tv_nsec - start.tv_nsec) / 1000000);
++#endif
++
+ #ifdef _3DS
+     // return (int)osGetTime();
+     return (int)(svcGetSystemTick() / CPU_TICKS_PER_MSEC);
+@@ -657,12 +673,16 @@
+ }
+ 
+ void delay_ticks(int ticks) {
+-#if !defined(WII) && !defined(_3DS)
++#if !defined(WII) && !defined(_3DS) && !defined(IOS)
+ #ifdef EMSCRIPTEN
+     emscripten_sleep(ticks);
+ #else
+     SDL_Delay(ticks);
+ #endif
++#endif
++
++#ifdef IOS
++    usleep((useconds_t)ticks * 1000);
+ #endif
+ 
+ #ifdef _3DS
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/utility.h b/utility.h
+--- a/utility.h	2026-10-04 22:23:17
++++ b/utility.h	2026-10-04 23:14:26
+@@ -25,6 +25,12 @@
+ #include <citro3d.h>
+ #include <tex3ds.h>
+ #endif
++#elif defined(IOS)
++#include <time.h>
++#include <unistd.h>
++
++/* implemented in mudclient-ios.c */
++const char *mudclient_ios_config_dir(void);
+ #else
+ #ifdef __SWITCH__
+ #include <SDL2/SDL.h>

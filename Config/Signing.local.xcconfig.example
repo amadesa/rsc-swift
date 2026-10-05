@@ -1,0 +1,7 @@
+// Copy to Signing.local.xcconfig (ignored by git) and fill in.
+
+// your Apple developer team ID, e.g. ABCDE12345
+DEVELOPMENT_TEAM =
+
+// a reverse-DNS prefix you own, e.g. com.example
+BUNDLE_ID_PREFIX = io.github.amadesa
