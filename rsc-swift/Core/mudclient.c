@@ -222,12 +222,33 @@ void mudclient_resize(mudclient *mud) {
         panel_destroy(mud->panel_login_worldlist);
         free(mud->panel_login_worldlist);
 
+        /* keep what was typed into the login form across the rebuild, e.g.
+         * when the screen rotates or iOS resizes the app while switching */
+        char login_username[USERNAME_LENGTH + 1] = {0};
+        char login_password[PASSWORD_LENGTH + 1] = {0};
+
+        /* not panel_get_text, which returns "null" for an empty control */
+        char *typed_username = mud->panel_login_existing_user
+                                   ->control_text[mud->control_login_username];
+        char *typed_password = mud->panel_login_existing_user
+                                   ->control_text[mud->control_login_password];
+
+        snprintf(login_username, sizeof(login_username), "%s",
+                 typed_username != NULL ? typed_username : "");
+        snprintf(login_password, sizeof(login_password), "%s",
+                 typed_password != NULL ? typed_password : "");
+
         panel_destroy(mud->panel_login_existing_user);
         free(mud->panel_login_existing_user);
 
         worldlist_new(mud);
 
         mudclient_create_login_panels(mud);
+
+        panel_update_text(mud->panel_login_existing_user,
+                          mud->control_login_username, login_username);
+        panel_update_text(mud->panel_login_existing_user,
+                          mud->control_login_password, login_password);
 
         panel_destroy(mud->panel_appearance);
         free(mud->panel_appearance);
@@ -1904,6 +1925,12 @@ void mudclient_reset_game(mudclient *mud) {
     mud->logout_timeout = 0;
     mud->login_screen = 0;
     mud->logged_in = 1;
+
+#ifdef IOS
+    /* the server starts every login on controlled, so re-apply the style
+     * last picked for this character on this world */
+    mudclient_ios_restore_combat_style(mud);
+#endif
 
     memset(mud->input_pm_current, '\0', INPUT_PM_LENGTH + 1);
     memset(mud->input_pm_final, '\0', INPUT_PM_LENGTH + 1);
@@ -5248,6 +5275,12 @@ void mudclient_run(mudclient *mud) {
 
         if (!aptMainLoop()) {
             return;
+        }
+#elif defined(IOS)
+        /* keep the connection and game state going in the background, but
+         * nothing is on screen to draw */
+        if (!mudclient_ios_is_background()) {
+            mudclient_draw(mud);
         }
 #else
         mudclient_draw(mud);

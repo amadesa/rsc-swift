@@ -28,6 +28,10 @@ final class GameViewController: UIViewController {
             self?.gameView.startTyping(text: text, isPassword: isPassword)
         }
 
+        GameClient.shared.onHideKeyboard = { [weak self] in
+            self?.gameView.stopTyping()
+        }
+
         GameClient.shared.onWorldRequest = { [weak self] in
             self?.addWorld.present()
         }
@@ -39,6 +43,28 @@ final class GameViewController: UIViewController {
         GameClient.shared.onRegister = { [weak self] name, url in
             self?.register(worldName: name, url: url)
         }
+
+        let center = NotificationCenter.default
+        center.addObserver(
+            self, selector: #selector(didEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification, object: nil)
+        center.addObserver(
+            self, selector: #selector(willEnterForeground),
+            name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    @objc private func didEnterBackground() {
+        // iOS doesn't allow GPU work from the background
+        gameView.isPaused = true
+        GameClient.shared.enterBackground()
+    }
+
+    @objc private func willEnterForeground() {
+        GameClient.shared.enterForeground()
+        gameView.isPaused = false
+
+        // apply any size change that was skipped while in the background
+        view.setNeedsLayout()
     }
 
     override func viewDidLayoutSubviews() {
@@ -46,6 +72,14 @@ final class GameViewController: UIViewController {
 
         let size = Self.gameSize(for: gameView.bounds.size)
         guard size.width > 0, size.height > 0 else { return }
+
+        // while switching apps iOS lays the app out at other sizes for its
+        // snapshots. resizing the game rebuilds its screens, so ignore those
+        // and catch up when the app comes back
+        if GameClient.shared.isStarted,
+           UIApplication.shared.applicationState == .background {
+            return
+        }
 
         if let gameSize, gameSize == size { return }
         gameSize = size

@@ -35,6 +35,10 @@ typedef enum {
 typedef void (*RscKeyboardCallback)(void *context, const char *text,
                                     int is_password);
 
+/* called on the game thread when the focused text field goes away, e.g.
+ * after logging in or switching login screens */
+typedef void (*RscHideKeyboardCallback)(void *context);
+
 /* called on the game thread, e.g. for wiki lookups */
 typedef void (*RscOpenURLCallback)(void *context, const char *url);
 
@@ -67,6 +71,7 @@ typedef struct {
 
     void *context;
     RscKeyboardCallback on_keyboard;
+    RscHideKeyboardCallback on_hide_keyboard;
     RscSoundCallback on_sound;
     RscOpenURLCallback on_open_url;
     RscRequestWorldCallback on_request_world;
@@ -101,6 +106,13 @@ void rsc_add_world(const char *name, const char *host, int port,
 
 /* remove a world from the world list (the last one is always kept) */
 void rsc_remove_world(int index);
+
+/* whether a player is logged in to a world */
+int rsc_is_logged_in(void);
+
+/* while in the background the game keeps running (staying connected) but
+ * skips drawing */
+void rsc_set_background(int background);
 
 /* type printable ASCII text */
 void rsc_text(const char *text);

@@ -5,7 +5,11 @@ import UIKit
 final class GameView: MTKView {
     private var renderer: FrameRenderer?
     private let inputPreview = InputPreviewBar()
-    private let keyboardProxy = KeyboardProxyField()
+    // separate fields so only the game's password box offers password
+    // AutoFill (see KeyboardProxyField)
+    private let textProxy = KeyboardProxyField(isPassword: false)
+    private let passwordProxy = KeyboardProxyField(isPassword: true)
+    private var activeProxy: KeyboardProxyField?
 
     /// True while the game has a text field focused.
     private(set) var isTyping = false
@@ -23,9 +27,9 @@ final class GameView: MTKView {
 
         inputPreview.onDone = { [weak self] in self?.stopTyping() }
 
-        keyboardProxy.delegate = self
-        keyboardProxy.inputAccessoryView = inputPreview
-        addSubview(keyboardProxy)
+        textProxy.delegate = self
+        passwordProxy.delegate = self
+        addSubview(textProxy)
     }
 
     required init(coder: NSCoder) {
@@ -69,21 +73,41 @@ final class GameView: MTKView {
     func startTyping(text: String, isPassword: Bool) {
         isTyping = true
 
+        let proxy = isPassword ? passwordProxy : textProxy
+
+        // the password field is only in the view while it's used: iOS treats
+        // other text fields near a password field as username fields and
+        // offers saved passwords on them too
+        if proxy.superview == nil {
+            addSubview(proxy)
+        }
+
         // mirror the game's field so the keyboard has something to delete
-        keyboardProxy.isSecureTextEntry = isPassword
-        keyboardProxy.text = text
+        proxy.text = text
         inputPreview.set(text: text, isPassword: isPassword)
 
-        if keyboardProxy.isFirstResponder {
-            keyboardProxy.reloadInputViews()
+        if activeProxy !== proxy {
+            // the accessory bar can only belong to one field at a time
+            activeProxy?.inputAccessoryView = nil
+            proxy.inputAccessoryView = inputPreview
+            activeProxy = proxy
+        }
+
+        if proxy.isFirstResponder {
+            proxy.reloadInputViews()
         } else {
-            keyboardProxy.becomeFirstResponder()
+            proxy.becomeFirstResponder()
+        }
+
+        if !isPassword {
+            passwordProxy.removeFromSuperview()
         }
     }
 
     func stopTyping() {
         isTyping = false
-        keyboardProxy.resignFirstResponder()
+        activeProxy?.resignFirstResponder()
+        passwordProxy.removeFromSuperview()
     }
 }
 
@@ -91,9 +115,16 @@ final class GameView: MTKView {
 /// into the game view directly, so it behaves like any other text field:
 /// holding delete repeats (and speeds up to whole words) and paste works.
 /// Every edit is forwarded to the game as backspaces and characters.
+///
+/// Password AutoFill remembers a field once it has been secure, so a single
+/// field toggled between the login password and chat kept offering saved
+/// passwords in chat. The password box gets its own field instead.
 private final class KeyboardProxyField: UITextField {
-    init() {
+    init(isPassword: Bool) {
         super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+
+        isSecureTextEntry = isPassword
+        textContentType = isPassword ? .password : nil
 
         // must stay visible and interactive to become first responder, so
         // make it nearly transparent and let touches fall through instead
@@ -110,7 +141,7 @@ private final class KeyboardProxyField: UITextField {
         smartInsertDeleteType = .no
         returnKeyType = .done
 
-        accessibilityIdentifier = "keyboardProxy"
+        accessibilityIdentifier = isPassword ? "passwordProxy" : "keyboardProxy"
     }
 
     required init?(coder: NSCoder) {

@@ -23,6 +23,7 @@ Runs on iOS/iPadOS 12 and later.
 - World list with **Add world** (import an rscplus world `.ini` from Files
   or a URL, or enter a host and port by hand) and **Remove**.
 - Camera defaults to manual on touch screens until you pick a mode in game.
+- Combat style is remembered per character and world.
 
 ## Building
 

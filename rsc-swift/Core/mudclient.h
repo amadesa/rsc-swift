@@ -394,6 +394,10 @@ void mudclient_ios_request_remove_world(int index, char *name);
 void mudclient_ios_register(char *world_name, char *url);
 void mudclient_ios_present(int32_t *pixels, int width, int height);
 int mudclient_ios_main(int argc, char **argv);
+int mudclient_ios_is_background(void);
+void mudclient_ios_save_combat_style(mudclient *mud);
+void mudclient_ios_restore_combat_style(mudclient *mud);
+int mudclient_ios_saved_combat_style(mudclient *mud);
 #else
 #ifdef SDL12
 void get_sdl_keycodes(SDL_keysym *keysym, char *char_code, int *code);

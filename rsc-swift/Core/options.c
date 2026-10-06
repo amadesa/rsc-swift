@@ -50,8 +50,15 @@ void options_set_defaults(Options *options) {
     options->max_skills = 18;
     options->registration = 0;
     options->idle_logout = 0;
+#ifdef IOS
+    /* the settings folder is kept out of device backups (GameClient.swift),
+     * so remembering the login stays on the phone */
+    options->remember_username = 1;
+    options->remember_password = 1;
+#else
     options->remember_username = 0;
     options->remember_password = 0;
+#endif
     options->diversify_npcs = 0;
     options->rename_herblaw_items = 0;
 

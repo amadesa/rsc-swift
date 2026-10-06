@@ -32,7 +32,8 @@ final class GameAudio {
 
     private func prepare(sampleRate: Double) -> Bool {
         if format == nil {
-            // mix with music from other apps rather than stopping it
+            // mix with music from other apps rather than stopping it, and
+            // respect the silent switch
             try? AVAudioSession.sharedInstance().setCategory(.ambient)
 
             format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)

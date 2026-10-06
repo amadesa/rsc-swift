@@ -495,6 +495,13 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
     surface_draw_string(mud->surface, "Click here to logout", ui_x + 3, y,
                         FONT_BOLD_12, text_colour);
 
+    /* the tap check below reuses where the link was actually drawn, rather
+     * than recomputing the layout, and is taller on touch screens where the
+     * 16 pixel high text was hard to hit */
+    int logout_y = y;
+    int logout_top = logout_y - (is_touch ? 18 : 12);
+    int logout_bottom = logout_y + (is_touch ? 10 : 4);
+
     if (!no_menus) {
         return;
     }
@@ -681,7 +688,7 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
         }
 
         if (mud->mouse_x > x && mud->mouse_x < x + OPTIONS_WIDTH &&
-            mud->mouse_y > y - 12 && mud->mouse_y < y + 4 &&
+            mud->mouse_y > logout_top && mud->mouse_y < logout_bottom &&
             mud->mouse_button_click == 1) {
             mudclient_send_logout(mud);
         }

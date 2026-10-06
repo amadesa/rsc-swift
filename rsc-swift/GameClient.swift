@@ -9,6 +9,9 @@ final class GameClient {
     /// Called when the game focuses a text field: (current text, is password).
     var onKeyboardRequest: ((String, Bool) -> Void)?
 
+    /// Called when the game's focused text field goes away.
+    var onHideKeyboard: (() -> Void)?
+
     /// Called when "Add world" is tapped on the world list.
     var onWorldRequest: (() -> Void)?
 
@@ -21,6 +24,9 @@ final class GameClient {
 
     private let audio = GameAudio()
     private(set) var isStarted = false
+    private var backgroundTask = UIBackgroundTaskIdentifier.invalid
+
+    var isLoggedIn: Bool { rsc_is_logged_in() != 0 }
 
     private init() {}
 
@@ -39,6 +45,7 @@ final class GameClient {
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(
             at: configDirectory, withIntermediateDirectories: true)
+        excludeFromBackup(configDirectory)
 
         var config = RscConfig()
         config.width = Int32(width)
@@ -53,6 +60,15 @@ final class GameClient {
 
             DispatchQueue.main.async {
                 client.onKeyboardRequest?(current, isPassword != 0)
+            }
+        }
+
+        config.on_hide_keyboard = { context in
+            let client = Unmanaged<GameClient>.fromOpaque(context!)
+                .takeUnretainedValue()
+
+            DispatchQueue.main.async {
+                client.onHideKeyboard?()
             }
         }
 
@@ -132,6 +148,44 @@ final class GameClient {
 
     func removeWorld(at index: Int) {
         rsc_remove_world(Int32(index))
+    }
+
+    /// iOS gives an app about 30 seconds of running time after it's left
+    /// before suspending it. Using that keeps the connection alive for quick
+    /// app switches; the server allows another 30 seconds of silence before
+    /// logging the player out. After longer absences the client's automatic
+    /// reconnect logs back in with the stored credentials on return.
+    func enterBackground() {
+        rsc_set_background(1)
+
+        guard isLoggedIn, backgroundTask == .invalid else { return }
+
+        backgroundTask = UIApplication.shared.beginBackgroundTask(
+            withName: "Stay connected") { [weak self] in
+            self?.endBackgroundTask()
+        }
+    }
+
+    func enterForeground() {
+        rsc_set_background(0)
+        endBackgroundTask()
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTask != .invalid else { return }
+
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
+    }
+
+    /// options.ini can hold the remembered password in plain text, so keep
+    /// the settings folder (options.ini and worlds.cfg) out of iCloud and
+    /// computer backups. Excluding the folder covers files created later.
+    private func excludeFromBackup(_ directory: URL) {
+        var directory = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? directory.setResourceValues(values)
     }
 
     func resize(width: Int, height: Int) {

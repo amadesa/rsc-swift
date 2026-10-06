@@ -37,6 +37,11 @@ void mudclient_draw_combat_style(mudclient *mud) {
             packet_stream_new_packet(mud->packet_stream, CLIENT_COMBAT_STYLE);
             packet_stream_put_byte(mud->packet_stream, mud->combat_style);
             packet_stream_send_packet(mud->packet_stream);
+
+#ifdef IOS
+            /* remembered per world and character for the next login */
+            mudclient_ios_save_combat_style(mud);
+#endif
             break;
         }
     }
