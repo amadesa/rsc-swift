@@ -5,7 +5,7 @@ A native iOS/iPadOS RuneScape Classic client, built around the
 Swift/Metal platform layer and a touch-first UI. It defaults to the
 [RSC Preservation](https://rsc.vet) world (`game.openrsc.com:43596`).
 
-Runs on iOS/iPadOS 12 and later.
+Runs on iOS/iPadOS 12.2 and later.
 
 ## Features
 
