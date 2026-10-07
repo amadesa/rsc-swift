@@ -16,12 +16,12 @@ final class GameViewController: UIViewController {
         view.addSubview(gameView)
 
         // keep the game's edge UI (tabs, chat) clear of the notch and corners
-        let safeArea = view.safeAreaLayoutGuide
+        let safeArea = view.safeEdges
         NSLayoutConstraint.activate([
-            gameView.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor),
-            gameView.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor),
-            gameView.topAnchor.constraint(equalTo: safeArea.topAnchor),
-            gameView.bottomAnchor.constraint(equalTo: safeArea.bottomAnchor),
+            gameView.leadingAnchor.constraint(equalTo: safeArea.leading),
+            gameView.trailingAnchor.constraint(equalTo: safeArea.trailing),
+            gameView.topAnchor.constraint(equalTo: safeArea.top),
+            gameView.bottomAnchor.constraint(equalTo: safeArea.bottom),
         ])
 
         GameClient.shared.onKeyboardRequest = { [weak self] text, isPassword in
@@ -81,7 +81,7 @@ final class GameViewController: UIViewController {
             return
         }
 
-        if let gameSize, gameSize == size { return }
+        if let gameSize = gameSize, gameSize == size { return }
         gameSize = size
 
         if GameClient.shared.isStarted {
@@ -106,7 +106,7 @@ final class GameViewController: UIViewController {
     }
 
     private func register(worldName: String, url: URL?) {
-        if let url {
+        if let url = url {
             UIApplication.shared.open(url)
             return
         }
@@ -131,7 +131,10 @@ final class GameViewController: UIViewController {
     }
 
     override var prefersStatusBarHidden: Bool { true }
+    @available(iOS 11.0, *)
     override var prefersHomeIndicatorAutoHidden: Bool { true }
+
+    @available(iOS 11.0, *)
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
 
     // MARK: - Hardware keyboard

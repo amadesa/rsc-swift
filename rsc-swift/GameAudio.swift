@@ -10,7 +10,7 @@ final class GameAudio {
 
     func play(_ samples: [Int16], sampleRate: Double) {
         queue.async { [self] in
-            guard prepare(sampleRate: sampleRate), let format,
+            guard prepare(sampleRate: sampleRate), let format = format,
                   let buffer = AVAudioPCMBuffer(
                     pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))
             else { return }

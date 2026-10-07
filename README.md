@@ -5,7 +5,9 @@ A native iOS/iPadOS RuneScape Classic client, built around the
 Swift/Metal platform layer and a touch-first UI. It defaults to the
 [RSC Preservation](https://rsc.vet) world (`game.openrsc.com:43596`).
 
-Runs on iOS/iPadOS 12.2 and later.
+Runs on iOS/iPadOS 12.2 and later. A separate legacy build runs on 32-bit
+devices stuck on iOS 10, such as the iPad 4 and iPhone 5 (see
+[Legacy build](#legacy-build-ios-10-32-bit)).
 
 ## Features
 
@@ -13,7 +15,8 @@ Runs on iOS/iPadOS 12.2 and later.
   controls from its Android/web builds. Tap = left click, hold = right click,
   horizontal drag = rotate camera, vertical drag or pinch = zoom.
 - Metal display at any screen size and orientation, kept clear of the notch
-  and rounded corners.
+  and rounded corners, with a Core Graphics fallback for devices without
+  Metal.
 - Native keyboard for chat and text boxes: hold-to-delete, paste, and a bar
   above the keyboard showing what you're typing. Hardware keyboards work
   too (arrows rotate the camera).
@@ -46,6 +49,30 @@ xcodebuild -project rsc-swift.xcodeproj -scheme rsc-swift \
 Set your team in `Signing.local.xcconfig` rather than in Xcode's
 Signing & Capabilities tab, which would write it into the project file.
 
+## Legacy build (iOS 10, 32-bit)
+
+Xcode 16 can't build for 32-bit (armv7) devices or target iOS 10, so
+`scripts/build-legacy.sh` builds those with the command-line tools from
+Xcode 13.4.1 instead:
+
+1. Download Xcode 13.4.1 from
+   [developer.apple.com/download/all](https://developer.apple.com/download/all)
+   (any Apple ID) and unpack it, e.g. to `/Applications/Xcode_13.4.1.app`.
+   It doesn't open on current macOS, but its build tools still work, and
+   your default Xcode isn't affected.
+2. Run `XCODE13=/Applications/Xcode_13.4.1.app scripts/build-legacy.sh`.
+   The unsigned `.ipa` is written to `build/legacy/`.
+3. Install it with [Sideloadly](https://sideloadly.io), which supports old
+   iOS versions (AltStore and SideStore need iOS 12.2 or later).
+
+Xcode 13 can't open this project's file format, so the script spells out
+the build: it compiles the C core and Swift app for armv7, bundles the Swift
+runtime (iOS 10 has none built in), and uses plain icon and launch image
+files instead of the asset catalog and storyboard, since Xcode 13's
+Interface Builder tools don't run on current macOS. On devices without
+Metal the app shows frames with Core Graphics (`FrameDisplay.swift`). The
+Swift code is kept compatible with Swift 5.6 and iOS 10.
+
 ## Project layout
 
 ```
@@ -59,13 +86,15 @@ rsc-swift/
   AppDelegate.swift           UIKit app entry point
   GameClient.swift            starts the game thread, routes callbacks
   GameViewController.swift    layout, game resolution, hardware keys, alerts
-  GameView.swift              Metal view, touches, keyboard proxy text field
+  GameView.swift              touches, keyboard proxy text fields
+  FrameDisplay.swift          Metal display, or Core Graphics without Metal
   FrameRenderer.swift         uploads frames to a Metal texture
   FrameShaders.metal
   GameAudio.swift             8kHz sound effects via AVAudioEngine
   AddWorldController.swift    "Add world" sheet
   WorldConfig.swift           world .ini parsing
 scripts/rsc-c-ios.patch       every change made to the upstream rsc-c files
+scripts/build-legacy.sh       32-bit iOS 10 build using Xcode 13's tools
 ```
 
 ## How it works
@@ -74,7 +103,8 @@ scripts/rsc-c-ios.patch       every change made to the upstream rsc-c files
   thread. Swift posts touches and keys into a locked queue that
   `mudclient_poll_events` drains on the game thread.
 - Each `surface_draw` copies the finished software-rendered frame into a
-  shared buffer, and `FrameRenderer` uploads the newest one to Metal.
+  shared buffer, and the display shows the newest one: `FrameRenderer`
+  uploads it to Metal, or without Metal it becomes a CGImage on a layer.
 - The client always loads at 512x346 like desktop rsc-c, then switches to
   the screen size; the login backdrop is pre-rendered while loading.
 - Phones render at about one game pixel per point; iPads scale so the short

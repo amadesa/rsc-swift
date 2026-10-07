@@ -1,9 +1,8 @@
-import MetalKit
 import UIKit
 
 /// Displays the game and forwards touches and on-screen keyboard input to it.
-final class GameView: MTKView {
-    private var renderer: FrameRenderer?
+final class GameView: UIView {
+    private let display = makeFrameDisplay()
     private let inputPreview = InputPreviewBar()
     // separate fields so only the game's password box offers password
     // AutoFill (see KeyboardProxyField)
@@ -14,16 +13,22 @@ final class GameView: MTKView {
     /// True while the game has a text field focused.
     private(set) var isTyping = false
 
-    init() {
-        super.init(frame: .zero, device: MTLCreateSystemDefaultDevice())
+    /// Stops drawing, e.g. while the app is in the background.
+    var isPaused: Bool {
+        get { display.isPaused }
+        set { display.isPaused = newValue }
+    }
 
-        colorPixelFormat = .bgra8Unorm
-        clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-        preferredFramesPerSecond = 60
+    init() {
+        super.init(frame: .zero)
+
+        backgroundColor = .black
         isMultipleTouchEnabled = true
 
-        renderer = FrameRenderer(view: self)
-        delegate = renderer
+        // touches land on this view; the display only draws
+        display.frame = bounds
+        display.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(display)
 
         inputPreview.onDone = { [weak self] in self?.stopTyping() }
 
@@ -32,7 +37,7 @@ final class GameView: MTKView {
         addSubview(textProxy)
     }
 
-    required init(coder: NSCoder) {
+    required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
@@ -124,7 +129,10 @@ private final class KeyboardProxyField: UITextField {
         super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
 
         isSecureTextEntry = isPassword
-        textContentType = isPassword ? .password : nil
+        // only the password box offers password AutoFill (iOS 11+)
+        if #available(iOS 11.0, *) {
+            textContentType = isPassword ? .password : nil
+        }
 
         // must stay visible and interactive to become first responder, so
         // make it nearly transparent and let touches fall through instead
@@ -136,9 +144,11 @@ private final class KeyboardProxyField: UITextField {
         autocorrectionType = .no
         autocapitalizationType = .none
         spellCheckingType = .no
-        smartQuotesType = .no
-        smartDashesType = .no
-        smartInsertDeleteType = .no
+        if #available(iOS 11.0, *) {
+            smartQuotesType = .no
+            smartDashesType = .no
+            smartInsertDeleteType = .no
+        }
         returnKeyType = .done
 
         accessibilityIdentifier = isPassword ? "passwordProxy" : "keyboardProxy"
@@ -239,10 +249,10 @@ final class InputPreviewBar: UIView {
         done.setContentHuggingPriority(.required, for: .horizontal)
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 16),
+            label.leadingAnchor.constraint(equalTo: safeEdges.leading, constant: 16),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
             done.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
-            done.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            done.trailingAnchor.constraint(equalTo: safeEdges.trailing, constant: -16),
             done.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
@@ -268,5 +278,30 @@ final class InputPreviewBar: UIView {
     private func render() {
         let shown = isPassword ? String(repeating: "•", count: text.count) : text
         label.text = shown + "▏"
+    }
+}
+
+/// The edges to keep content within: the safe area on iOS 11 and later, and
+/// the view's own edges before that (those devices have no notch or home
+/// indicator to avoid).
+struct SafeEdges {
+    let leading: NSLayoutXAxisAnchor
+    let trailing: NSLayoutXAxisAnchor
+    let top: NSLayoutYAxisAnchor
+    let bottom: NSLayoutYAxisAnchor
+}
+
+extension UIView {
+    var safeEdges: SafeEdges {
+        if #available(iOS 11.0, *) {
+            let guide = safeAreaLayoutGuide
+            return SafeEdges(
+                leading: guide.leadingAnchor, trailing: guide.trailingAnchor,
+                top: guide.topAnchor, bottom: guide.bottomAnchor)
+        }
+
+        return SafeEdges(
+            leading: leadingAnchor, trailing: trailingAnchor,
+            top: topAnchor, bottom: bottomAnchor)
     }
 }

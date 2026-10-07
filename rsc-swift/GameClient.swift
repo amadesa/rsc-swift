@@ -73,7 +73,7 @@ final class GameClient {
         }
 
         config.on_sound = { context, pcm, samples, sampleRate in
-            guard let pcm, samples > 0 else { return }
+            guard let pcm = pcm, samples > 0 else { return }
 
             let client = Unmanaged<GameClient>.fromOpaque(context!)
                 .takeUnretainedValue()
@@ -83,7 +83,7 @@ final class GameClient {
         }
 
         config.on_open_url = { _, url in
-            guard let url, let link = URL(string: String(cString: url)) else { return }
+            guard let url = url, let link = URL(string: String(cString: url)) else { return }
 
             DispatchQueue.main.async {
                 UIApplication.shared.open(link)

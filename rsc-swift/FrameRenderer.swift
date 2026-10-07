@@ -80,7 +80,7 @@ final class FrameRenderer: NSObject, MTKViewDelegate {
         let serial = rsc_frame_lock(&pixels, &width, &height)
         defer { rsc_frame_unlock() }
 
-        guard serial != lastSerial, let pixels, width > 0, height > 0 else {
+        guard serial != lastSerial, let pixels = pixels, width > 0, height > 0 else {
             return false
         }
 

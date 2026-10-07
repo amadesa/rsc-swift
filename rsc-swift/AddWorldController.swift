@@ -12,7 +12,7 @@ final class AddWorldController: NSObject {
     }
 
     func present() {
-        guard let presenter else { return }
+        guard let presenter = presenter else { return }
 
         let sheet = UIAlertController(
             title: "Add world",
@@ -121,7 +121,7 @@ final class AddWorldController: NSObject {
     private func download(_ url: URL) {
         URLSession.shared.dataTask(with: url) { [self] data, response, error in
             DispatchQueue.main.async { [self] in
-                if let error {
+                if let error = error {
                     showError(error.localizedDescription)
                 } else if let status = (response as? HTTPURLResponse)?.statusCode,
                           !(200..<300).contains(status) {
