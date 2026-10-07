@@ -76,14 +76,15 @@ Swift code is kept compatible with Swift 5.6 and iOS 10.
 ## Project layout
 
 ```
-Config/                       shared build settings and local signing template
+Config/                       shared build settings, signing template, Info.plist
 rsc-swift/
   Core/                       rsc-c sources (upstream 2ce1b5a) with iOS patches
     mudclient-ios.c           iOS platform layer: input queue, touch gestures,
                               frame handoff, sound/keyboard/URL/world callbacks
     rsc-bridge.h              C API used from Swift
   Resources/cache/            game data (.jag/.mem) from rsc-c
-  AppDelegate.swift           UIKit app entry point
+  AppDelegate.swift           UIKit app entry point (makes the window before iOS 13)
+  SceneDelegate.swift         makes the window on iOS 13+ (scene life cycle)
   GameClient.swift            starts the game thread, routes callbacks
   GameViewController.swift    layout, game resolution, hardware keys, alerts
   GameView.swift              touches, keyboard proxy text fields

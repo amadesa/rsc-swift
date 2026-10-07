@@ -34,7 +34,7 @@ void mudclient_create_login_panels(mudclient *mud) {
         int button_y = login_background_height + (is_compact ? 46 : 40);
 
         panel_add_text_centre(mud->panel_login_welcome, x, text_y,
-                              "Welcome to RuneScape",
+                              "Welcome to RuneScape Classic",
                               is_compact ? FONT_BOLD_13 : FONT_BOLD_14, 1);
 
         char *labels[4];
@@ -45,9 +45,12 @@ void mudclient_create_login_panels(mudclient *mud) {
         controls[count++] = &mud->control_welcome_existing_user;
 
 #ifdef IOS
-        /* opens the selected world's account creation page */
-        labels[count] = "Register";
-        controls[count++] = &mud->control_welcome_register;
+        /* opens the selected world's account creation page, unless hidden
+         * in Additional options > Game */
+        if (!mud->options->hide_register) {
+            labels[count] = "Register";
+            controls[count++] = &mud->control_welcome_register;
+        }
 #endif
 
         if (mud->options->show_additional_options) {

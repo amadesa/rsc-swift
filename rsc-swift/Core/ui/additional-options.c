@@ -100,6 +100,18 @@ void mudclient_create_options_panel(mudclient *mud) {
 
     y += OPTION_HORIZ_GAP;
 
+#ifdef IOS
+    /* for players who already have their accounts (see login.c) */
+    control = mudclient_add_option_panel_checkbox(
+        mud->panel_game_options, "@whi@Hide Register: ",
+        mud->options->hide_register, x, y);
+
+    mud->game_options[control] = &mud->options->hide_register;
+    mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
+
+    y += OPTION_HORIZ_GAP;
+#endif
+
     control = mudclient_add_option_panel_checkbox(
         mud->panel_game_options,
         "@whi@Diversify NPCs: ", mud->options->diversify_npcs, x, y);
@@ -752,6 +764,19 @@ void mudclient_draw_additional_options(mudclient *mud) {
     mud->surface->draw_string_shadow = mud->logged_in ? 1 : 0;
 }
 
+static void mudclient_close_additional_options(mudclient *mud) {
+    mud->show_additional_options = 0;
+
+#ifdef IOS
+    /* the login buttons are only laid out when the screen is built, so
+     * rebuild it for options like Hide Register to take effect. typed login
+     * details are kept (see mudclient_resize) */
+    if (!mud->logged_in) {
+        mudclient_on_resize(mud);
+    }
+#endif
+}
+
 void mudclient_handle_additional_options_input(mudclient *mud) {
     int ui_x = mud->surface->width / 2 - ADDITIONAL_OPTIONS_WIDTH / 2;
     int ui_y = mud->surface->height / 2 - ADDITIONAL_OPTIONS_HEIGHT / 2;
@@ -779,7 +804,7 @@ void mudclient_handle_additional_options_input(mudclient *mud) {
             mud->mouse_y >= ui_y &&
             mud->mouse_x < ui_x + ADDITIONAL_OPTIONS_WIDTH &&
             mud->mouse_y < ui_y + 12) {
-            mud->show_additional_options = 0;
+            mudclient_close_additional_options(mud);
         }
 
         /* save and close */
@@ -788,7 +813,7 @@ void mudclient_handle_additional_options_input(mudclient *mud) {
             mud->mouse_x < ui_x + ADDITIONAL_OPTIONS_WIDTH &&
             mud->mouse_y < ui_y + ADDITIONAL_OPTIONS_HEIGHT) {
             options_save(mud->options);
-            mud->show_additional_options = 0;
+            mudclient_close_additional_options(mud);
         }
 
         /* reset */

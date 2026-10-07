@@ -59,6 +59,7 @@ void options_set_defaults(Options *options) {
     options->remember_username = 0;
     options->remember_password = 0;
 #endif
+    options->hide_register = 0;
     options->diversify_npcs = 0;
     options->rename_herblaw_items = 0;
 
@@ -149,6 +150,7 @@ void options_set_vanilla(Options *options) {
     options->idle_logout = 1;
     options->remember_username = 0;
     options->remember_password = 0;
+    options->hide_register = 0;
     options->diversify_npcs = 0;
     options->rename_herblaw_items = 0;
 
@@ -258,6 +260,7 @@ void options_save(Options *options) {
             options->password,              //
             options->browser_command,       //
             options->camera_mode_chosen,    //
+            options->hide_register,         //
             options->diversify_npcs,        //
             options->rename_herblaw_items,  //
                                             //
@@ -366,6 +369,7 @@ void options_load(Options *options) {
     options->password[20] = '\0';
     OPTION_INI_STR("browser_command", options->browser_command, 20);
     OPTION_INI_INT("camera_mode_chosen", options->camera_mode_chosen, 0, 1);
+    OPTION_INI_INT("hide_register", options->hide_register, 0, 1);
 #ifdef RENDER_SW
     OPTION_INI_INT("diversify_npcs", options->diversify_npcs, 0, 1);
 #else

@@ -922,8 +922,8 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
      Panel *panel_magic;
 diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/options.c b/options.c
 --- a/options.c	2026-10-04 22:23:17
-+++ b/options.c	2026-10-06 11:44:17
-@@ -50,8 +50,15 @@
++++ b/options.c	2026-10-07 14:39:06
+@@ -50,8 +50,16 @@
      options->max_skills = 18;
      options->registration = 0;
      options->idle_logout = 0;
@@ -936,18 +936,28 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
      options->remember_username = 0;
      options->remember_password = 0;
 +#endif
++    options->hide_register = 0;
      options->diversify_npcs = 0;
      options->rename_herblaw_items = 0;
  
-@@ -250,6 +257,7 @@
+@@ -142,6 +150,7 @@
+     options->idle_logout = 1;
+     options->remember_username = 0;
+     options->remember_password = 0;
++    options->hide_register = 0;
+     options->diversify_npcs = 0;
+     options->rename_herblaw_items = 0;
+ 
+@@ -250,6 +259,8 @@
              options->username,              //
              options->password,              //
              options->browser_command,       //
 +            options->camera_mode_chosen,    //
++            options->hide_register,         //
              options->diversify_npcs,        //
              options->rename_herblaw_items,  //
                                              //
-@@ -354,7 +362,10 @@
+@@ -354,7 +365,11 @@
      OPTION_INI_INT("remember_password", options->remember_password, 0, 1);
      OPTION_INI_STR("username", options->username, 20);
      OPTION_INI_STR("password", options->password, 20);
@@ -955,22 +965,25 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
 +    options->password[20] = '\0';
      OPTION_INI_STR("browser_command", options->browser_command, 20);
 +    OPTION_INI_INT("camera_mode_chosen", options->camera_mode_chosen, 0, 1);
++    OPTION_INI_INT("hide_register", options->hide_register, 0, 1);
  #ifdef RENDER_SW
      OPTION_INI_INT("diversify_npcs", options->diversify_npcs, 0, 1);
  #else
 diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/options.h b/options.h
 --- a/options.h	2026-10-04 22:23:17
-+++ b/options.h	2026-10-06 11:44:17
-@@ -45,6 +45,8 @@
++++ b/options.h	2026-10-07 14:38:47
+@@ -45,6 +45,10 @@
       "password = %s\n\n"                                                       \
       "; System command to use to open the web browser (only on desktop)\n"     \
       "browser_command = %s\n\n"                                                \
 +     "; Camera angle mode was picked in game (otherwise default to manual)\n"  \
 +     "camera_mode_chosen = %d\n\n"                                             \
++     "; Hide the Register button on the login screen (iOS)\n"                 \
++     "hide_register = %d\n\n"                                                  \
       "; Diversify NPCs sent by server (custom)\n"                              \
       "diversify_npcs = %d\n\n"                                                 \
       "; Rename Herblaw items for ease of identification (custom)\n"            \
-@@ -215,6 +217,10 @@
+@@ -215,6 +219,13 @@
      int remember_username;
      int remember_password;
  
@@ -978,10 +991,13 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
 +     * switches the account to manual on login */
 +    int camera_mode_chosen;
 +
++    /* leave Register off the login screen's buttons (iOS) */
++    int hide_register;
++
      /* diversify NPCs sent by server (custom) */
      int diversify_npcs;
  
-@@ -227,9 +233,10 @@
+@@ -227,9 +238,10 @@
      /* url to open wiki pages in */
      char wiki_url[255];
  
@@ -1172,6 +1188,67 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
  #else
  #ifdef SDL12
      SDL_BlitSurface(mud->pixel_surface, NULL, mud->screen, NULL);
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/additional-options.c b/ui/additional-options.c
+--- a/ui/additional-options.c	2026-10-04 22:23:17
++++ b/ui/additional-options.c	2026-10-07 14:39:06
+@@ -100,7 +100,19 @@
+ 
+     y += OPTION_HORIZ_GAP;
+ 
++#ifdef IOS
++    /* for players who already have their accounts (see login.c) */
+     control = mudclient_add_option_panel_checkbox(
++        mud->panel_game_options, "@whi@Hide Register: ",
++        mud->options->hide_register, x, y);
++
++    mud->game_options[control] = &mud->options->hide_register;
++    mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
++
++    y += OPTION_HORIZ_GAP;
++#endif
++
++    control = mudclient_add_option_panel_checkbox(
+         mud->panel_game_options,
+         "@whi@Diversify NPCs: ", mud->options->diversify_npcs, x, y);
+ 
+@@ -752,6 +764,19 @@
+     mud->surface->draw_string_shadow = mud->logged_in ? 1 : 0;
+ }
+ 
++static void mudclient_close_additional_options(mudclient *mud) {
++    mud->show_additional_options = 0;
++
++#ifdef IOS
++    /* the login buttons are only laid out when the screen is built, so
++     * rebuild it for options like Hide Register to take effect. typed login
++     * details are kept (see mudclient_resize) */
++    if (!mud->logged_in) {
++        mudclient_on_resize(mud);
++    }
++#endif
++}
++
+ void mudclient_handle_additional_options_input(mudclient *mud) {
+     int ui_x = mud->surface->width / 2 - ADDITIONAL_OPTIONS_WIDTH / 2;
+     int ui_y = mud->surface->height / 2 - ADDITIONAL_OPTIONS_HEIGHT / 2;
+@@ -779,7 +804,7 @@
+             mud->mouse_y >= ui_y &&
+             mud->mouse_x < ui_x + ADDITIONAL_OPTIONS_WIDTH &&
+             mud->mouse_y < ui_y + 12) {
+-            mud->show_additional_options = 0;
++            mudclient_close_additional_options(mud);
+         }
+ 
+         /* save and close */
+@@ -788,7 +813,7 @@
+             mud->mouse_x < ui_x + ADDITIONAL_OPTIONS_WIDTH &&
+             mud->mouse_y < ui_y + ADDITIONAL_OPTIONS_HEIGHT) {
+             options_save(mud->options);
+-            mud->show_additional_options = 0;
++            mudclient_close_additional_options(mud);
+         }
+ 
+         /* reset */
 diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/combat-style.c b/ui/combat-style.c
 --- a/ui/combat-style.c	2026-10-04 22:23:17
 +++ b/ui/combat-style.c	2026-10-06 09:05:21
@@ -1201,8 +1278,8 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
              SDL_RestoreWindow(mud->window);
 diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/login.c b/ui/login.c
 --- a/ui/login.c	2026-10-04 22:23:17
-+++ b/ui/login.c	2026-10-05 11:08:19
-@@ -20,7 +20,58 @@
++++ b/ui/login.c	2026-10-07 14:39:15
+@@ -20,7 +20,61 @@
      int show_registration =
          !mud->options->members || mud->options->registration;
  
@@ -1221,7 +1298,7 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
 +        int button_y = login_background_height + (is_compact ? 46 : 40);
 +
 +        panel_add_text_centre(mud->panel_login_welcome, x, text_y,
-+                              "Welcome to RuneScape",
++                              "Welcome to RuneScape Classic",
 +                              is_compact ? FONT_BOLD_13 : FONT_BOLD_14, 1);
 +
 +        char *labels[4];
@@ -1232,9 +1309,12 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
 +        controls[count++] = &mud->control_welcome_existing_user;
 +
 +#ifdef IOS
-+        /* opens the selected world's account creation page */
-+        labels[count] = "Register";
-+        controls[count++] = &mud->control_welcome_register;
++        /* opens the selected world's account creation page, unless hidden
++         * in Additional options > Game */
++        if (!mud->options->hide_register) {
++            labels[count] = "Register";
++            controls[count++] = &mud->control_welcome_register;
++        }
 +#endif
 +
 +        if (mud->options->show_additional_options) {
@@ -1262,7 +1342,7 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
          int offset_x = is_compact ? 16 : 0;
  
          panel_add_text_centre(
-@@ -83,7 +134,7 @@
+@@ -83,7 +137,7 @@
              button_width, 35);
      }
  
@@ -1271,7 +1351,7 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
          int button_x = (is_compact ? MUD_MIN_WIDTH : MUD_VANILLA_WIDTH) - 36;
  
          int button_y =
-@@ -964,6 +1015,12 @@
+@@ -964,6 +1018,12 @@
          } else if (panel_is_clicked(mud->panel_login_welcome,
                                      mud->control_welcome_worlds)) {
              mud->login_screen = LOGIN_STAGE_WORLD;
@@ -1430,6 +1510,63 @@ diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclie
              mud->mouse_button_click == 1) {
              mudclient_send_logout(mud);
          }
+diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/sleep.c b/ui/sleep.c
+--- a/ui/sleep.c	2026-10-04 22:23:17
++++ b/ui/sleep.c	2026-10-07 14:37:39
+@@ -130,6 +130,19 @@
+                                 "@yel@%s here@whi@ to get a different one",
+                                 is_touch ? "tap" : "click");
+ 
++    /* the on-screen keyboard button, where it is during gameplay, as another
++     * way to start typing the word */
++    if (is_touch) {
++        int keyboard_button_x = 0;
++        int keyboard_button_y = 0;
++
++        mudclient_get_keyboard_button_position(mud, &keyboard_button_x,
++                                               &keyboard_button_y);
++
++        surface_draw_sprite(mud->surface, keyboard_button_x, keyboard_button_y,
++                            mud->sprite_media + 40);
++    }
++
+     surface_draw(mud->surface);
+ }
+ 
+@@ -177,10 +190,29 @@
+     int keyboard_width = 200;
+     int keyboard_height = 28;
+ 
+-    if (mud->last_mouse_button_down == 1 && mud->mouse_x > keyboard_x &&
+-        mud->mouse_x < keyboard_x + keyboard_width &&
+-        mud->mouse_y > keyboard_y &&
+-        mud->mouse_y < keyboard_y + keyboard_height) {
++    int is_within_keyboard_button = 0;
++
++    if (mudclient_is_touch(mud)) {
++        int button_x = 0;
++        int button_y = 0;
++
++        mudclient_get_keyboard_button_position(mud, &button_x, &button_y);
++
++        is_within_keyboard_button =
++            mud->mouse_x >= button_x &&
++            mud->mouse_x <=
++                button_x + mud->surface->sprite_width[mud->sprite_media + 40] &&
++            mud->mouse_y >= button_y &&
++            mud->mouse_y <=
++                button_y + mud->surface->sprite_height[mud->sprite_media + 40];
++    }
++
++    if (mud->last_mouse_button_down == 1 &&
++        (is_within_keyboard_button ||
++         (mud->mouse_x > keyboard_x &&
++          mud->mouse_x < keyboard_x + keyboard_width &&
++          mud->mouse_y > keyboard_y &&
++          mud->mouse_y < keyboard_y + keyboard_height))) {
+         mudclient_trigger_keyboard(mud, mud->input_text_current, 0, keyboard_x,
+                                    keyboard_y, keyboard_width, keyboard_height,
+                                    FONT_BOLD_16, 1);
 diff -ruN -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/worldlist.c b/ui/worldlist.c
 --- a/ui/worldlist.c	2026-10-04 22:23:17
 +++ b/ui/worldlist.c	2026-10-05 14:01:43

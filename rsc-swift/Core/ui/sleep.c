@@ -130,6 +130,19 @@ void mudclient_draw_sleep(mudclient *mud) {
                                 "@yel@%s here@whi@ to get a different one",
                                 is_touch ? "tap" : "click");
 
+    /* the on-screen keyboard button, where it is during gameplay, as another
+     * way to start typing the word */
+    if (is_touch) {
+        int keyboard_button_x = 0;
+        int keyboard_button_y = 0;
+
+        mudclient_get_keyboard_button_position(mud, &keyboard_button_x,
+                                               &keyboard_button_y);
+
+        surface_draw_sprite(mud->surface, keyboard_button_x, keyboard_button_y,
+                            mud->sprite_media + 40);
+    }
+
     surface_draw(mud->surface);
 }
 
@@ -177,10 +190,29 @@ void mudclient_handle_sleep_input(mudclient *mud) {
     int keyboard_width = 200;
     int keyboard_height = 28;
 
-    if (mud->last_mouse_button_down == 1 && mud->mouse_x > keyboard_x &&
-        mud->mouse_x < keyboard_x + keyboard_width &&
-        mud->mouse_y > keyboard_y &&
-        mud->mouse_y < keyboard_y + keyboard_height) {
+    int is_within_keyboard_button = 0;
+
+    if (mudclient_is_touch(mud)) {
+        int button_x = 0;
+        int button_y = 0;
+
+        mudclient_get_keyboard_button_position(mud, &button_x, &button_y);
+
+        is_within_keyboard_button =
+            mud->mouse_x >= button_x &&
+            mud->mouse_x <=
+                button_x + mud->surface->sprite_width[mud->sprite_media + 40] &&
+            mud->mouse_y >= button_y &&
+            mud->mouse_y <=
+                button_y + mud->surface->sprite_height[mud->sprite_media + 40];
+    }
+
+    if (mud->last_mouse_button_down == 1 &&
+        (is_within_keyboard_button ||
+         (mud->mouse_x > keyboard_x &&
+          mud->mouse_x < keyboard_x + keyboard_width &&
+          mud->mouse_y > keyboard_y &&
+          mud->mouse_y < keyboard_y + keyboard_height))) {
         mudclient_trigger_keyboard(mud, mud->input_text_current, 0, keyboard_x,
                                    keyboard_y, keyboard_width, keyboard_height,
                                    FONT_BOLD_16, 1);

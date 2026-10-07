@@ -47,6 +47,8 @@ typedef struct Options Options;
      "browser_command = %s\n\n"                                                \
      "; Camera angle mode was picked in game (otherwise default to manual)\n"  \
      "camera_mode_chosen = %d\n\n"                                             \
+     "; Hide the Register button on the login screen (iOS)\n"                 \
+     "hide_register = %d\n\n"                                                  \
      "; Diversify NPCs sent by server (custom)\n"                              \
      "diversify_npcs = %d\n\n"                                                 \
      "; Rename Herblaw items for ease of identification (custom)\n"            \
@@ -220,6 +222,9 @@ struct Options {
     /* the player picked a camera angle mode in game. until they do, iOS
      * switches the account to manual on login */
     int camera_mode_chosen;
+
+    /* leave Register off the login screen's buttons (iOS) */
+    int hide_register;
 
     /* diversify NPCs sent by server (custom) */
     int diversify_npcs;
