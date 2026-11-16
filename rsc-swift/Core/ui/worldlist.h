@@ -7,7 +7,15 @@ void worldlist_new(mudclient *mud);
 void worldlist_handle_mouse(mudclient *mud);
 void worldlist_add(mudclient *mud, const char *name, const char *host,
                    int port, const char *rsa_exponent,
-                   const char *rsa_modulus, const char *register_url);
+                   const char *rsa_modulus, const char *register_url,
+                   int retro);
+
+/* whether the last selected world (read from worlds.cfg, before the panel
+ * exists) runs the May 2001 game */
+int worldlist_last_world_is_retro(mudclient *mud);
+
+/* whether the world at this index runs the May 2001 game */
+int worldlist_is_retro(int index);
 void worldlist_remove(mudclient *mud, int index);
 #ifdef IOS
 void worldlist_register(mudclient *mud);

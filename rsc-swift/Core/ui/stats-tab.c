@@ -12,8 +12,30 @@ const char *skill_names[] = {
 
 int skills_length;
 
-static const char *equipment_stat_names[] = {"Armour", "WeaponAim",
-                                             "WeaponPower", "Magic", "Prayer"};
+/* the May 2001 game's skills, in the order its server sends them */
+static const char *retro_skill_names[] = {
+    "Attack",      "Defense",    "Strength",  "Hits",      "Ranged",
+    "Thieving",    "Influence",  "PrayGood",  "PrayEvil",  "GoodMagic",
+    "EvilMagic",   "Cooking",    "Tailoring", "Woodcutting",
+    "Firemaking",  "Crafting",   "Smithing",  "Mining",    "Herblaw"};
+
+/* hiding is only in the 2001 game */
+static const char *equipment_stat_names[] = {
+    "Armour", "WeaponAim", "WeaponPower", "Magic", "Prayer", "Hiding"};
+
+const char *mudclient_skill_name(mudclient *mud, int skill) {
+    if (mudclient_is_retro(mud)) {
+        return skill >= 0 && skill < RETRO_SKILL_COUNT
+                   ? retro_skill_names[skill]
+                   : "";
+    }
+
+    return skill >= 0 && skill < skills_length ? skill_names[skill] : "";
+}
+
+int mudclient_skill_count(mudclient *mud) {
+    return mudclient_is_retro(mud) ? RETRO_SKILL_COUNT : skills_length;
+}
 
 static int experience_array[100];
 
@@ -88,6 +110,8 @@ void mudclient_draw_equipment_status(mudclient *mud, int x, int y,
 
     y += line_break;
 
+    int is_retro = mudclient_is_retro(mud);
+
     for (int i = 0; i < 3; i++) {
         if (no_menus && mud->selected_wiki && mud->mouse_x > x + 5 &&
             mud->mouse_x < x + (STATS_WIDTH / 2) + 25 &&
@@ -105,7 +129,7 @@ void mudclient_draw_equipment_status(mudclient *mud, int x, int y,
         surface_draw_string(mud->surface, formatted_stat, x + 5, y,
                             FONT_BOLD_12, WHITE);
 
-        if (i < 2) {
+        if (i < 2 || is_retro) {
             if (no_menus && mud->selected_wiki &&
                 mud->mouse_x > x + (STATS_WIDTH / 2) + 25 &&
                 mud->mouse_y > y - line_break && mud->mouse_y < y + 3) {
@@ -143,6 +167,11 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
         !is_watch_area &&
         (is_touch || mud->surface->height < (height + 12) + ui_y);
 
+    /* the 2001 game has no quest list (influence instead of quest points),
+     * fatigue or experience */
+    int is_retro = mudclient_is_retro(mud);
+    int shows_fatigue = mud->options->fatigue && !is_retro;
+
     const char *stats_tabs[3];
 
     if (is_compact) {
@@ -156,17 +185,20 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
         stats_tabs[1] = "Quests";
     }
 
+    int tab_count = (is_compact ? 3 : 2) - is_retro;
+
     int line_break = (is_compact && !is_touch ? 11 : 12);
 
-    if (!is_compact && !mud->options->fatigue) {
+    if (!is_compact && !shows_fatigue) {
         height -= line_break;
     }
 
-    if (mud->options->max_skills < 18) {
+    if (mud->options->max_skills < 18 && !is_retro) {
         height -= line_break;
     }
 
-    if (mud->options->total_experience || mud->options->remaining_experience) {
+    if (!is_retro && (mud->options->total_experience ||
+                      mud->options->remaining_experience)) {
         height += line_break;
     }
 
@@ -226,12 +258,11 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
                                  panel_width, BLACK);
 
     surface_draw_tabs(mud->surface, ui_x, ui_y, panel_width, STATS_TAB_HEIGHT,
-                      stats_tabs, is_compact ? 3 : 2,
-                      mud->ui_tab_stats_sub_tab);
+                      stats_tabs, tab_count, mud->ui_tab_stats_sub_tab);
 
-    mud->ui_tab_stats_sub_tab = !is_compact && mud->ui_tab_stats_sub_tab > 1
-                                    ? 1
-                                    : mud->ui_tab_stats_sub_tab;
+    if (mud->ui_tab_stats_sub_tab >= tab_count) {
+        mud->ui_tab_stats_sub_tab = tab_count - 1;
+    }
 
     /* the handler for the skills/equipment tab */
     if (mud->ui_tab_stats_sub_tab == 0) {
@@ -256,7 +287,11 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
         int second_column_indent;
         const char **display_skills;
 
-        if (mud->options->max_skills < 18) {
+        if (is_retro) {
+            skills_per_column = 10;
+            display_skills = retro_skill_names;
+            second_column_indent = ui_x + (panel_width / 2) - 8;
+        } else if (mud->options->max_skills < 18) {
             skills_per_column = 8;
             display_skills = skill_names;
             second_column_indent = ui_x + (panel_width / 2) - 7;
@@ -266,82 +301,112 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
             second_column_indent = ui_x + (panel_width / 2) - 5;
         }
 
+        /* the 2001 game's 19 split 10 and 9: on the desktop the right column
+         * starts a line up, so it gets the 10 (as the 2001 client had it) */
+        int left_count = skills_per_column;
+        int right_count = skills_per_column;
+
+        if (is_retro) {
+            left_count = is_compact ? 10 : 9;
+            right_count = RETRO_SKILL_COUNT - left_count;
+        }
+
+        int rows = left_count > right_count ? left_count : right_count;
+
         /* draw two columns with each skill name and current/base levels */
-        for (int i = 0; i < skills_per_column; i++) {
-            total_experience += mud->player_experience[i];
-            total_experience += mud->player_experience[i + skills_per_column];
+        for (int i = 0; i < rows; i++) {
+            /* longest skill name (11), @yel@ (5), two levels 3 each (6),
+             * colon (1), slash (1) */
+            char formatted_skill[25] = {0};
 
             /* left column */
-            int text_colour = WHITE;
+            if (i < left_count) {
+                int text_colour = WHITE;
 
-            if (no_menus && mud->mouse_x > ui_x + 3 &&
-                mud->mouse_y >= y - (line_break - 1) && mud->mouse_y < y + 2 &&
-                mud->mouse_x < ui_x + (panel_width / 2) - 8) {
-                text_colour = RED;
-                selected_skill = i;
+                total_experience += mud->player_experience[i];
+
+                if (no_menus && mud->mouse_x > ui_x + 3 &&
+                    mud->mouse_y >= y - (line_break - 1) &&
+                    mud->mouse_y < y + 2 &&
+                    mud->mouse_x < ui_x + (panel_width / 2) - 8) {
+                    text_colour = RED;
+                    selected_skill = i;
+                }
+
+                sprintf(formatted_skill, "%s:@yel@%d/%d", display_skills[i],
+                        mud->player_skill_current[i],
+                        mud->player_skill_base[i]);
+
+                surface_draw_string(mud->surface, formatted_skill, ui_x + 5,
+                                    y, FONT_BOLD_12, text_colour);
             }
-
-            /* longest skill name (10), @yel@ (4), two skills 3 each (6), colon
-             * (1), slash (1) */
-            char formatted_skill[23] = {0};
-
-            sprintf(formatted_skill, "%s:@yel@%d/%d", display_skills[i],
-                    mud->player_skill_current[i], mud->player_skill_base[i]);
-
-            surface_draw_string(mud->surface, formatted_skill, ui_x + 5, y,
-                                FONT_BOLD_12, text_colour);
 
             /* right column */
-            text_colour = WHITE;
+            if (i < right_count) {
+                int skill = i + left_count;
+                int text_colour = WHITE;
 
-            /* where the right column starts, moved over on the wider watch */
-            if (no_menus &&
-                mud->mouse_x >= ui_x + 90 + (panel_width - STATS_WIDTH) / 2 &&
-                mud->mouse_y >= y - (line_break * (is_compact ? 1 : 2)) &&
-                mud->mouse_y < y - (is_compact ? 0 : (line_break - 1)) &&
-                mud->mouse_x < ui_x + panel_width) {
-                text_colour = RED;
-                selected_skill = i + skills_per_column;
+                total_experience += mud->player_experience[skill];
+
+                /* where the right column starts, moved over on the wider
+                 * watch */
+                if (no_menus &&
+                    mud->mouse_x >=
+                        ui_x + 90 + (panel_width - STATS_WIDTH) / 2 &&
+                    mud->mouse_y >= y - (line_break * (is_compact ? 1 : 2)) &&
+                    mud->mouse_y < y - (is_compact ? 0 : (line_break - 1)) &&
+                    mud->mouse_x < ui_x + panel_width) {
+                    text_colour = RED;
+                    selected_skill = skill;
+                }
+
+                sprintf(formatted_skill, "%s:@yel@%d/%d",
+                        display_skills[skill],
+                        mud->player_skill_current[skill],
+                        mud->player_skill_base[skill]);
+
+                surface_draw_string(mud->surface, formatted_skill,
+                                    second_column_indent,
+                                    y - (is_compact ? 0 : line_break + 1),
+                                    FONT_BOLD_12, text_colour);
             }
 
-            sprintf(formatted_skill, "%s:@yel@%d/%d",
-                    display_skills[i + skills_per_column],
-                    mud->player_skill_current[i + skills_per_column],
-                    mud->player_skill_base[i + skills_per_column]);
+            /* the desktop's right column is a line up, so its extra row (the
+             * 2001 game's tenth) sits beside the last on the left */
+            if (i < left_count) {
+                y += line_break + 1;
+            }
+        }
 
-            surface_draw_string(mud->surface, formatted_skill,
-                                second_column_indent,
-                                y - (is_compact ? 0 : line_break + 1),
-                                FONT_BOLD_12, text_colour);
-
+        /* the quest points and fatigue line, which the 2001 game's tenth
+         * row of skills takes */
+        if (is_compact && !is_retro) {
             y += line_break + 1;
         }
 
-        if (is_compact) {
-            y += line_break + 1;
-        }
-
-        if (no_menus && mud->selected_wiki &&
+        if (!is_retro && no_menus && mud->selected_wiki &&
             mud->mouse_x > second_column_indent &&
             mud->mouse_y > y - (line_break * 2) &&
             mud->mouse_y < y - (line_break - 1)) {
             mudclient_menu_add_wiki(mud, "Quest Points", "Quest Points");
         }
 
-        char formatted_quest_points[30] = {0};
+        if (!is_retro) {
+            char formatted_quest_points[30] = {0};
 
-        sprintf(formatted_quest_points, "Quest Points:@yel@%d",
-                mud->player_quest_points);
+            sprintf(formatted_quest_points, "Quest Points:@yel@%d",
+                    mud->player_quest_points);
 
-        surface_draw_string(mud->surface, formatted_quest_points,
-                            second_column_indent, y - 13, FONT_BOLD_12,
-                            WHITE);
+            surface_draw_string(mud->surface, formatted_quest_points,
+                                second_column_indent, y - 13, FONT_BOLD_12,
+                                WHITE);
+        }
 
         if (!is_compact) {
             y += line_break;
         }
 
-        if (mud->options->fatigue) {
+        if (shows_fatigue) {
             char formatted_fatigue[27] = {0};
 
             if (no_menus && mud->selected_wiki && mud->mouse_x > ui_x + 5 &&
@@ -380,6 +445,16 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
         if (mud->options->total_experience) {
             wiki_height += line_break;
+        }
+
+        if (selected_skill != -1 && is_retro) {
+            /* the 2001 server sends no experience */
+            if (no_menus && mud->selected_wiki) {
+                mudclient_menu_add_wiki(mud, retro_skill_names[selected_skill],
+                                        retro_skill_names[selected_skill]);
+            }
+
+            selected_skill = -1;
         }
 
         if (selected_skill != -1) {
@@ -463,7 +538,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
             int total_level = 0;
 
-            for (int i = 0; i < skills_length; i++) {
+            for (int i = 0; i < mudclient_skill_count(mud); i++) {
                 total_level += mud->player_skill_base[i];
             }
 
@@ -477,7 +552,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
             y += line_break;
 
-            if (mud->options->total_experience) {
+            if (mud->options->total_experience && !is_retro) {
                 mudclient_format_number_commas(mud, total_experience / 4,
                                                formatted_number);
 
@@ -504,8 +579,9 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
             y += line_break;
         }
-    } else if ((!is_compact && mud->ui_tab_stats_sub_tab == 1) ||
-               (is_compact && mud->ui_tab_stats_sub_tab == 2)) {
+    } else if (!is_retro &&
+               ((!is_compact && mud->ui_tab_stats_sub_tab == 1) ||
+                (is_compact && mud->ui_tab_stats_sub_tab == 2))) {
         int stats_height = 36 + STATS_HEIGHT + 5;
 
         if (no_menus && mud->selected_wiki && mud->mouse_x > ui_x + 5 &&
@@ -573,7 +649,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
                           : mouse_x >= 0 && mouse_x < panel_width;
 
     if (is_within_x && mouse_y >= 0 && mouse_y < height) {
-        int quest_tab = is_compact ? 2 : 1;
+        int quest_tab = is_retro ? -1 : is_compact ? 2 : 1;
 
         if (mud->ui_tab_stats_sub_tab == quest_tab) {
             if (is_touch) {
@@ -590,7 +666,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
         }
 
         if (mouse_y <= STATS_TAB_HEIGHT) {
-            int total_tabs = is_compact ? 3 : 2;
+            int total_tabs = tab_count;
             int selected_tab = mouse_x / (panel_width / total_tabs);
 
             if (selected_tab < 0 || selected_tab >= total_tabs) {

@@ -172,7 +172,11 @@
 #define GROUND_ITEMS_MAX 5000
 #define PRAYER_COUNT 50
 #define PLAYER_SKILL_COUNT 18
+/* room for the 19 skills of the 2001 game */
+#define PLAYER_SKILL_MAX 19
 #define PLAYER_STAT_EQUIPMENT_COUNT 5
+/* and the 2001 game's sixth, hiding */
+#define PLAYER_STAT_EQUIPMENT_MAX 6
 #define PROJECTILE_RANGE_MAX 40
 
 /* TODO overhead max? */
@@ -267,6 +271,15 @@
 #define SKILL_PRAYER 5
 #define SKILL_MAGIC 6
 
+/* the 2001 game's skills, where they differ */
+#define RETRO_SKILL_COUNT 19
+#define RETRO_SKILL_THIEVING 5
+#define RETRO_SKILL_INFLUENCE 6
+#define RETRO_SKILL_PRAY_GOOD 7
+#define RETRO_SKILL_PRAY_EVIL 8
+#define RETRO_SKILL_GOOD_MAGIC 9
+#define RETRO_SKILL_EVIL_MAGIC 10
+
 /* sprite stuff */
 #define SPRITE_LIMIT 4000
 
@@ -284,6 +297,7 @@ typedef struct mudclient mudclient;
 #include "colours.h"
 #include "game-character.h"
 #include "game-data.h"
+#include "retro-data.h"
 #include "game-model.h"
 #include "lib/bzip.h"
 #include "options.h"
@@ -323,6 +337,7 @@ typedef struct mudclient mudclient;
 #include "ui/welcome.h"
 #include "ui/wilderness-warning.h"
 #include "ui/worldlist.h"
+#include "game-switch.h"
 
 #include "custom/clarify-herblaw-items.h"
 #include "custom/diverse-npcs.h"
@@ -385,6 +400,10 @@ void mudclient_3ds_gl_frame_end();
 #elif defined(IOS)
 /* implemented in mudclient-ios.c */
 const char *mudclient_ios_cache_dir(void);
+/* where the app keeps game data it downloads (the 2001 game's), or "" */
+const char *mudclient_ios_data_dir(void);
+/* ask the app for the 2001 game's data (game-switch.c) */
+void mudclient_ios_request_retro_data(void);
 void mudclient_ios_get_game_size(int *width, int *height);
 void mudclient_ios_show_keyboard(char *text, int is_password);
 void mudclient_ios_play_sound(int16_t *pcm, int samples);
@@ -642,6 +661,12 @@ struct mudclient {
     int loading_progress_percent;
     char *loading_progess_text;
     int8_t error_loading_data;
+
+    /* ./game-switch.c: the selected world's game, the 2001 data download
+     * and a login waiting for it */
+    int8_t world_is_retro;
+    int8_t retro_data_state;
+    int8_t login_after_retro_data;
 
     int timings[10];
     int stop_timeout;
@@ -937,12 +962,12 @@ struct mudclient {
     int control_list_quest;
     int8_t *quest_complete;
     int ui_tab_stats_sub_tab;
-    int player_skill_current[PLAYER_SKILL_COUNT];
-    int player_skill_base[PLAYER_SKILL_COUNT];
-    int player_experience[PLAYER_SKILL_COUNT];
+    int player_skill_current[PLAYER_SKILL_MAX];
+    int player_skill_base[PLAYER_SKILL_MAX];
+    int player_experience[PLAYER_SKILL_MAX];
     int player_quest_points;
     int stat_fatigue;
-    int player_stat_equipment[PLAYER_STAT_EQUIPMENT_COUNT];
+    int player_stat_equipment[PLAYER_STAT_EQUIPMENT_MAX];
 
     /* ./ui/worldlist.c */
     Panel *panel_login_worldlist;
@@ -1002,6 +1027,21 @@ struct mudclient {
     int appearance_top_colour;
     int appearance_skin_colour;
     int appearance_bottom_colour;
+
+    /* the May 2001 game's second page: the character type (adventurer,
+     * warrior, wizard, necromancer, ranger) and whether to fight players */
+    Panel *panel_appearance_retro;
+    int control_appearance_class_left;
+    int control_appearance_class_right;
+    int control_appearance_class_text;
+    int control_appearance_pk_left;
+    int control_appearance_pk_right;
+    int control_appearance_pk_text;
+    int control_appearance_back;
+    int control_appearance_start;
+    int8_t appearance_retro_page;
+    int appearance_class;
+    int appearance_pk_mode;
 
     /* ./ui/option-menu.c */
     int8_t show_option_menu;
@@ -1240,6 +1280,9 @@ void mudclient_sdl1_on_resize(mudclient *mud, int width, int height);
 #endif
 void mudclient_on_resize(mudclient *mud);
 void mudclient_poll_events(mudclient *mud);
+int mudclient_is_retro(mudclient *mud);
+/* the wiki lookup option, which is for the later game only */
+int mudclient_wiki_lookup(mudclient *mud);
 int mudclient_is_touch(mudclient *mud);
 void mudclient_trigger_keyboard(mudclient *mud, char *text, int is_password,
                                 int x, int y, int width, int height, int font,

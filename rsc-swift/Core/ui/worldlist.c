@@ -18,6 +18,8 @@ struct server_type {
     char rsa_modulus[512];
     /* account creation page, may be empty */
     char register_url[256];
+    /* runs the May 2001 game (2001Scape) rather than the later one */
+    int retro;
 };
 
 static struct server_type list[WORLDLIST_MAX] = {0};
@@ -25,13 +27,15 @@ static struct server_type list[WORLDLIST_MAX] = {0};
 /* which defaults a saved list has been given, kept as a "#defaults N" line
  * in worlds.cfg (older builds skip it). a world added to the defaults later
  * is added to saved lists once, so removing it again sticks */
-#define WORLDLIST_DEFAULTS_VERSION 2
+#define WORLDLIST_DEFAULTS_VERSION 3
 
 static void worldlist_set_defaults(void);
 static void worldlist_set_2001scape(struct server_type *world);
 static int worldlist_add_new_defaults(int version, int count);
 static void worldlist_write(void);
 static void worldlist_read_presets(struct mudclient *mud);
+static void worldlist_read_file(void);
+static int worldlist_is_known_retro(const char *host, int port);
 static void worldlist_populate(mudclient *mud);
 static void worldlist_select(mudclient *, int);
 static const char *worldlist_known_register_url(const char *host);
@@ -66,6 +70,13 @@ static void worldlist_set_2001scape(struct server_type *world) {
     strcpy(world->rsa_exponent, "00010001");
     strcpy(world->rsa_modulus, "87cef754966ecb19806238d9fecf0f421e816976f74f365c86a584e51049794d41fefbdc5fed3a3ed3b7495ba24262bb7d1dd5d2ff9e306b5bbf5522a2e85b25");
     strcpy(world->register_url, worldlist_known_register_url(world->host));
+    world->retro = 1;
+}
+
+/* 2001Scape, for lists saved before worlds had a game */
+static int worldlist_is_known_retro(const char *host, int port) {
+    return strcmp(host, "game.openrsc.com") == 0 &&
+           (port == 43593 || port == 43493);
 }
 
 /* gives a list saved with older defaults the worlds added since, returning
@@ -137,20 +148,27 @@ static void worldlist_write(void) {
             }
         }
 
-        /* the register url is an optional sixth field, "-" when unset */
-        fprintf(file, "%s %s %d %s %s %s\n", name, list[i].host,
+        /* the register url is an optional sixth field, "-" when unset, and
+         * the game an optional seventh, "2001" for the May 2001 game */
+        fprintf(file, "%s %s %d %s %s %s%s\n", name, list[i].host,
                 list[i].port, list[i].rsa_exponent, list[i].rsa_modulus,
-                list[i].register_url[0] != '\0' ? list[i].register_url : "-");
+                list[i].register_url[0] != '\0' ? list[i].register_url : "-",
+                list[i].retro ? " 2001" : "");
     }
 
     fclose(file);
 }
 
 static void worldlist_read_presets(struct mudclient *mud) {
+    panel_clear_list(mud->panel_login_worldlist, mud->control_list_worlds);
+    worldlist_read_file();
+}
+
+/* reads worlds.cfg into the list (or the defaults), without the panel, so
+ * the game can see the last world's game before loading */
+static void worldlist_read_file(void) {
     char path[PATH_MAX];
     int num = 0;
-
-    panel_clear_list(mud->panel_login_worldlist, mud->control_list_worlds);
 
     get_config_path("worlds.cfg", path);
 
@@ -174,9 +192,12 @@ static void worldlist_read_presets(struct mudclient *mud) {
             continue;
         }
 
-        int res = sscanf(line, "%30s %60s %d %500s %500s %255s", world->name,
-                         world->host, &world->port, world->rsa_exponent,
-                         world->rsa_modulus, world->register_url);
+        char game[8] = {0};
+
+        int res = sscanf(line, "%30s %60s %d %500s %500s %255s %7s",
+                         world->name, world->host, &world->port,
+                         world->rsa_exponent, world->rsa_modulus,
+                         world->register_url, game);
 
         if (res < 5) {
             memset(world, 0, sizeof(*world));
@@ -186,6 +207,14 @@ static void worldlist_read_presets(struct mudclient *mud) {
         if (res < 6 || strcmp(world->register_url, "-") == 0) {
             strcpy(world->register_url,
                    worldlist_known_register_url(world->host));
+        }
+
+        world->retro = res >= 7 && strcmp(game, "2001") == 0;
+
+        /* saved before worlds had a game */
+        if (defaults_version < 3 &&
+            worldlist_is_known_retro(world->host, world->port)) {
+            world->retro = 1;
         }
 
         num++;
@@ -358,6 +387,19 @@ void worldlist_new(mudclient *mud) {
 }
 
 static void worldlist_select(mudclient *mud, int index) {
+    /* the game is switched to match before the next login screen or login
+     * (game-switch.c) */
+    mud->world_is_retro = list[index].retro;
+
+    /* choosing it again retries a failed download; another world doesn't
+     * need the message */
+    if (mud->retro_data_state == RETRO_DATA_FAILED) {
+        mud->retro_data_state = RETRO_DATA_IDLE;
+
+        if (!list[index].retro && !mud->logged_in) {
+            mudclient_show_login_screen_status(mud, "", "");
+        }
+    }
     strcpy(mud->server, list[index].host);
     strcpy(mud->rsa_exponent, list[index].rsa_exponent);
     strcpy(mud->rsa_modulus, list[index].rsa_modulus);
@@ -369,7 +411,8 @@ static void worldlist_select(mudclient *mud, int index) {
 
 void worldlist_add(mudclient *mud, const char *name, const char *host,
                    int port, const char *rsa_exponent,
-                   const char *rsa_modulus, const char *register_url) {
+                   const char *rsa_modulus, const char *register_url,
+                   int retro) {
     int index = 0;
 
     while (index < WORLDLIST_MAX - 1 && list[index].name[0] != '\0') {
@@ -396,6 +439,8 @@ void worldlist_add(mudclient *mud, const char *name, const char *host,
                worldlist_known_register_url(list[index].host));
     }
 
+    list[index].retro = retro || worldlist_is_known_retro(host, port);
+
     worldlist_write();
     worldlist_populate(mud);
     worldlist_select(mud, index);
@@ -409,6 +454,22 @@ static int worldlist_count(void) {
     }
 
     return count;
+}
+
+int worldlist_last_world_is_retro(mudclient *mud) {
+    worldlist_read_file();
+
+    int index = mud->options->last_world;
+
+    if (index < 0 || index >= worldlist_count()) {
+        index = 0;
+    }
+
+    return list[index].retro;
+}
+
+int worldlist_is_retro(int index) {
+    return index >= 0 && index < worldlist_count() && list[index].retro;
 }
 
 void worldlist_remove(mudclient *mud, int index) {

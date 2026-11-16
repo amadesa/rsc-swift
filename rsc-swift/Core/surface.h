@@ -308,6 +308,10 @@ void surface_read_sleep_word(Surface *surface, int sprite_id,
 int32_t *surface_palette_sprite_to_raster(Surface *surface, int sprite_id,
                                           int add_alpha);
 void surface_load_sprite(Surface *surface, int sprite_id);
+
+/* frees the sprites from and up to (not including) to, for loading another
+ * game's (game-switch.c) */
+void surface_free_sprites(Surface *surface, int from, int to);
 void surface_screen_raster_to_sprite(Surface *surface, int sprite_id, int x,
                                      int y, int width, int height);
 void surface_draw_sprite_reversed(Surface *surface, int sprite_id, int x, int y,

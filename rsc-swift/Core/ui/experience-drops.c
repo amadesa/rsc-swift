@@ -33,7 +33,8 @@ void mudclient_draw_experience_drops(mudclient *mud) {
         char formatted_amount[15] = {0};
         mudclient_format_number_commas(mud, experience, formatted_amount);
 
-        const char *skill_name = skill_names[mud->experience_drop_skill[i]];
+        const char *skill_name =
+            mudclient_skill_name(mud, mud->experience_drop_skill[i]);
 
         size_t n = strlen(skill_name) + strlen(formatted_amount) +
                    strlen(formatted_remainder);

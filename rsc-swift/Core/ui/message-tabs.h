@@ -35,6 +35,9 @@ void mudclient_draw_chat_message_tabs_panel(mudclient *mud);
 void mudclient_send_command_string(mudclient *mud, char *command);
 void mudclient_send_chat_message(mudclient *mud, int8_t *encoded,
                                  int encoded_length);
+void mudclient_get_keyboard_button_size(mudclient *mud, int *width,
+                                        int *height);
+void mudclient_draw_keyboard_button(mudclient *mud, int x, int y);
 void mudclient_get_keyboard_button_position(mudclient *mud, int *x, int *y);
 void mudclient_handle_message_tabs_input(mudclient *mud);
 void mudclient_decrement_message_flash(mudclient *mud);

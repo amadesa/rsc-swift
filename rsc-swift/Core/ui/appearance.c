@@ -149,9 +149,182 @@ void mudclient_create_appearance_panel(mudclient *mud) {
     mud->control_appearance_accept =
         panel_add_button(mud->panel_appearance, x, y, APPEARANCE_ACCEPT_WIDTH,
                          APPEARANCE_ACCEPT_HEIGHT);
+
+    mudclient_create_appearance_retro_panel(mud);
+}
+
+static const char *retro_classes[] = {"Adventurer", "Warrior", "Wizard",
+                                      "Necromancer", "Ranger"};
+
+static const char *retro_pk_modes[] = {"No thanks", "Yes I'll fight"};
+
+#define RETRO_CLASS_COUNT 5
+
+/* a choice between arrows, like the appearance boxes but wider */
+static void create_retro_choice(mudclient *mud, int x, int y, int *left,
+                                int *text, int *right) {
+    Panel *panel = mud->panel_appearance_retro;
+
+    panel_add_box_rounded(panel, x, y, APPEARANCE_RETRO_CHOICE_WIDTH, 26);
+    *text = panel_add_text_centre(panel, x, y, "", FONT_BOLD_13, 1);
+
+    int arrow_x = APPEARANCE_RETRO_CHOICE_WIDTH / 2 + 20;
+
+    *left = panel_add_button(panel, x - arrow_x, y, APPEARANCE_ARROW_SIZE,
+                             APPEARANCE_ARROW_SIZE);
+    panel_add_sprite(panel, x - arrow_x, y, panel_base_sprite_start + 7);
+
+    *right = panel_add_button(panel, x + arrow_x, y, APPEARANCE_ARROW_SIZE,
+                              APPEARANCE_ARROW_SIZE);
+    panel_add_sprite(panel, x + arrow_x, y, panel_base_sprite_start + 6);
+}
+
+/* the words are the 2001 client's */
+void mudclient_create_appearance_retro_panel(mudclient *mud) {
+    mud->panel_appearance_retro = malloc(sizeof(Panel));
+    panel_new(mud->panel_appearance_retro, mud->surface, 40);
+
+    Panel *panel = mud->panel_appearance_retro;
+
+    int is_compact = mud->surface->width < MUD_VANILLA_WIDTH ||
+                     mud->surface->height < MUD_VANILLA_HEIGHT;
+
+    int x = (is_compact ? MUD_MIN_WIDTH : MUD_VANILLA_WIDTH) / 2;
+    int y = is_compact ? 10 : 24;
+    int line = is_compact ? 12 : 13;
+
+    panel_add_text_centre(panel, x, y, "Character Type", FONT_BOLD_14, 1);
+    y += is_compact ? 16 : 22;
+
+    panel_add_text_centre(panel, x, y,
+                          "Each character type has different starting",
+                          FONT_REGULAR_11, 1);
+    y += line;
+    panel_add_text_centre(panel, x, y, "bonuses. But the choice you make here",
+                          FONT_REGULAR_11, 1);
+    y += line;
+    panel_add_text_centre(panel, x, y,
+                          "isn't permanent, and will change depending",
+                          FONT_REGULAR_11, 1);
+    y += line;
+    panel_add_text_centre(panel, x, y, "on how you play the game.",
+                          FONT_REGULAR_11, 1);
+    y += is_compact ? 22 : 32;
+
+    create_retro_choice(mud, x, y, &mud->control_appearance_class_left,
+                        &mud->control_appearance_class_text,
+                        &mud->control_appearance_class_right);
+    y += is_compact ? 28 : 42;
+
+    panel_add_text_centre(panel, x, y,
+                          "Do you wish to be able to fight with other",
+                          FONT_REGULAR_11, 1);
+    y += line;
+    panel_add_text_centre(panel, x, y,
+                          "players? Warning! If you choose 'yes' then",
+                          FONT_REGULAR_11, 1);
+    y += line;
+    panel_add_text_centre(panel, x, y,
+                          "other players will be able to attack you too!",
+                          FONT_REGULAR_11, 1);
+    y += is_compact ? 22 : 32;
+
+    create_retro_choice(mud, x, y, &mud->control_appearance_pk_left,
+                        &mud->control_appearance_pk_text,
+                        &mud->control_appearance_pk_right);
+    y += is_compact ? 32 : 50;
+
+    /* back to the looks, and start */
+    int back_width = 70;
+    int start_width = APPEARANCE_RETRO_CHOICE_WIDTH;
+    int gap = 8;
+    int total = back_width + gap + start_width;
+    int back_x = x - total / 2 + back_width / 2;
+    int start_x = x + total / 2 - start_width / 2;
+    int button_height = is_compact ? 26 : APPEARANCE_ACCEPT_HEIGHT;
+
+    panel_add_button_background(panel, back_x, y, back_width, button_height);
+    panel_add_text_centre(panel, back_x, y, "Back", 4, 0);
+    mud->control_appearance_back =
+        panel_add_button(panel, back_x, y, back_width, button_height);
+
+    panel_add_button_background(panel, start_x, y, start_width,
+                                button_height);
+    panel_add_text_centre(panel, start_x, y, "Start Game", 4, 0);
+    mud->control_appearance_start =
+        panel_add_button(panel, start_x, y, start_width, button_height);
+
+    panel_update_text(panel, mud->control_appearance_class_text,
+                      (char *)retro_classes[mud->appearance_class]);
+    panel_update_text(panel, mud->control_appearance_pk_text,
+                      (char *)retro_pk_modes[mud->appearance_pk_mode]);
+}
+
+static void send_appearance(mudclient *mud) {
+    packet_stream_new_packet(mud->packet_stream, CLIENT_APPEARANCE);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_head_gender);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_head_type);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_body_type);
+    packet_stream_put_byte(mud->packet_stream, 2);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_hair_colour);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_top_colour);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_bottom_colour);
+    packet_stream_put_byte(mud->packet_stream, mud->appearance_skin_colour);
+
+    /* the 2001 game's class and pk mode (see retro-packets.c) */
+    if (mudclient_is_retro(mud)) {
+        packet_stream_put_byte(mud->packet_stream, mud->appearance_class);
+        packet_stream_put_byte(mud->packet_stream, mud->appearance_pk_mode);
+    }
+
+    packet_stream_send_packet(mud->packet_stream);
+
+    surface_black_screen(mud->surface);
+    mud->show_appearance_change = 0;
+    mud->appearance_retro_page = 0;
+}
+
+static void handle_appearance_retro_input(mudclient *mud) {
+    Panel *panel = mud->panel_appearance_retro;
+
+    panel_handle_mouse(panel, mud->mouse_x, mud->mouse_y,
+                       mud->last_mouse_button_down, mud->mouse_button_down,
+                       mud->mouse_scroll_delta);
+
+    if (panel_is_clicked(panel, mud->control_appearance_class_left)) {
+        mud->appearance_class =
+            (mud->appearance_class - 1 + RETRO_CLASS_COUNT) % RETRO_CLASS_COUNT;
+    }
+
+    if (panel_is_clicked(panel, mud->control_appearance_class_right)) {
+        mud->appearance_class = (mud->appearance_class + 1) % RETRO_CLASS_COUNT;
+    }
+
+    if (panel_is_clicked(panel, mud->control_appearance_pk_left) ||
+        panel_is_clicked(panel, mud->control_appearance_pk_right)) {
+        mud->appearance_pk_mode = !mud->appearance_pk_mode;
+    }
+
+    panel_update_text(panel, mud->control_appearance_class_text,
+                      (char *)retro_classes[mud->appearance_class]);
+    panel_update_text(panel, mud->control_appearance_pk_text,
+                      (char *)retro_pk_modes[mud->appearance_pk_mode]);
+
+    if (panel_is_clicked(panel, mud->control_appearance_back)) {
+        mud->appearance_retro_page = 0;
+    }
+
+    if (panel_is_clicked(panel, mud->control_appearance_start)) {
+        send_appearance(mud);
+    }
 }
 
 void mudclient_handle_appearance_panel_input(mudclient *mud) {
+    if (mud->appearance_retro_page) {
+        handle_appearance_retro_input(mud);
+        return;
+    }
+
     panel_handle_mouse(mud->panel_appearance, mud->mouse_x, mud->mouse_y,
                        mud->last_mouse_button_down, mud->mouse_button_down,
                        mud->mouse_scroll_delta);
@@ -264,28 +437,29 @@ void mudclient_handle_appearance_panel_input(mudclient *mud) {
 
     if (panel_is_clicked(mud->panel_appearance,
                          mud->control_appearance_accept)) {
-        packet_stream_new_packet(mud->packet_stream, CLIENT_APPEARANCE);
-        packet_stream_put_byte(mud->packet_stream, mud->appearance_head_gender);
-        packet_stream_put_byte(mud->packet_stream, mud->appearance_head_type);
-        packet_stream_put_byte(mud->packet_stream, mud->appearance_body_type);
-        packet_stream_put_byte(mud->packet_stream, 2);
-        packet_stream_put_byte(mud->packet_stream, mud->appearance_hair_colour);
-        packet_stream_put_byte(mud->packet_stream, mud->appearance_top_colour);
-
-        packet_stream_put_byte(mud->packet_stream,
-                               mud->appearance_bottom_colour);
-
-        packet_stream_put_byte(mud->packet_stream, mud->appearance_skin_colour);
-        packet_stream_send_packet(mud->packet_stream);
-
-        surface_black_screen(mud->surface);
-        mud->show_appearance_change = 0;
+        /* the 2001 game asks for a character type and pk mode next */
+        if (mudclient_is_retro(mud)) {
+            mud->appearance_retro_page = 1;
+        } else {
+            send_appearance(mud);
+        }
     }
 }
 
 void mudclient_draw_appearance_panel(mudclient *mud) {
     mud->surface->interlace = 0;
     surface_black_screen(mud->surface);
+
+    if (mud->appearance_retro_page) {
+        panel_draw_panel(mud->panel_appearance_retro);
+
+        if (!mud->options->lowmem) {
+            mudclient_draw_blue_bar(mud);
+        }
+
+        surface_draw(mud->surface);
+        return;
+    }
 
     panel_draw_panel(mud->panel_appearance);
 

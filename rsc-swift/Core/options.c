@@ -245,6 +245,11 @@ void options_save(Options *options) {
 
     char file_buffer[65536] = {0};
 
+    /* the later game's data versions, not the 2001 game's (game-switch.c) */
+    Options saved = *options;
+    options_saved_versions(&saved);
+    options = &saved;
+
 #ifdef IOS
     /* the apps keep passwords in the keychain and fill in the remembered
      * one with rsc_set_login, so options.ini never holds it */

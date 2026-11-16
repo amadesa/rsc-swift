@@ -553,6 +553,16 @@ void mudclient_draw_ui_tab_label(mudclient *mud, int selected_tab, int width,
 
     int sprite_id = mud->sprite_media + 26 + selected_tab;
 
+    /* the 2001 game's media has no labels sprite */
+    if (mud->surface->sprite_width[sprite_id] == 0) {
+        surface_draw_string(mud->surface,
+                            mudclient_ui_tab_names[selected_tab - 1], x + 2,
+                            y + 8, FONT_REGULAR_11, WHITE);
+
+        surface_draw_line_horizontal(mud->surface, x, y + 9, width, BLACK);
+        return;
+    }
+
     int label_offset = !mudclient_is_touch(mud) && mud->show_ui_tab > 4
                            ? width - mud->surface->sprite_width[sprite_id] - 3
                            : 1;

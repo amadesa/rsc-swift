@@ -1,6 +1,32 @@
 #include "magic-tab.h"
+#include "../retro-data.h"
 
 static const char *magic_tabs[] = {"Magic", "Prayers"};
+
+/* the May 2001 game has two spell books and no prayers */
+static const char *retro_magic_tabs[] = {"Good magic", "Evil magic"};
+
+/* the spells the open book lists (all of them, or the 2001 game's good or
+ * evil ones) and the skill they need */
+static void get_spell_book(mudclient *mud, int *first, int *count,
+                           int *skill) {
+    *first = 0;
+    *count = game_data.spell_count;
+    *skill = SKILL_MAGIC;
+
+    if (!mudclient_is_retro(mud)) {
+        return;
+    }
+
+    if (mud->ui_tab_magic_sub_tab == 1) {
+        *first = retro_good_spell_count;
+        *count = retro_evil_spell_count;
+        *skill = RETRO_SKILL_EVIL_MAGIC;
+    } else {
+        *count = retro_good_spell_count;
+        *skill = RETRO_SKILL_GOOD_MAGIC;
+    }
+}
 
 void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
     /* wider on the watch, filling the space (ui-tabs.c) */
@@ -78,8 +104,17 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
 
     description_y += 11;
 
+    int is_retro = mudclient_is_retro(mud);
+
     surface_draw_tabs(mud->surface, ui_x, ui_y, panel_width, MAGIC_TAB_HEIGHT,
-                      magic_tabs, 2, mud->ui_tab_magic_sub_tab);
+                      is_retro ? retro_magic_tabs : magic_tabs, 2,
+                      mud->ui_tab_magic_sub_tab);
+
+    int first_spell = 0;
+    int spell_count = 0;
+    int magic_skill = 0;
+
+    get_spell_book(mud, &first_spell, &spell_count, &magic_skill);
 
     int mouse_x = mud->mouse_x - ui_x;
     int mouse_y = mud->mouse_y - ui_y;
@@ -104,12 +139,13 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
 
     char *point = is_touch ? "Tap and hold" : "Point";
 
-    if (mud->ui_tab_magic_sub_tab == 0) {
+    if (is_retro || mud->ui_tab_magic_sub_tab == 0) {
         panel_clear_list(mud->panel_magic, mud->control_list_magic);
 
-        int magic_level = mud->player_skill_current[SKILL_MAGIC];
+        int magic_level = mud->player_skill_current[magic_skill];
 
-        for (int i = 0; i < game_data.spell_count; i++) {
+        for (int entry = 0; entry < spell_count; entry++) {
+            int i = first_spell + entry;
             char colour_prefix[6] = "@yel@";
 
             for (int j = 0; j < game_data.spells[i].runes_required; j++) {
@@ -137,8 +173,8 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
             sprintf(formatted_spell, "%sLevel %d: %s", colour_prefix,
                     game_data.spells[i].level, game_data.spells[i].name);
 
-            panel_add_list_entry(mud->panel_magic, mud->control_list_magic, i,
-                                 formatted_spell);
+            panel_add_list_entry(mud->panel_magic, mud->control_list_magic,
+                                 entry, formatted_spell);
         }
 
         panel_draw_panel(mud->panel_magic);
@@ -147,6 +183,8 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
                                                      mud->control_list_magic);
 
         if (spell_index != -1) {
+            spell_index += first_spell;
+
             char *spell_name = game_data.spells[spell_index].name;
             char formatted_spell[64] = {0};
 
@@ -312,17 +350,28 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
         return;
     }
 
-    if (mud->ui_tab_magic_sub_tab == 0) {
+    if (is_retro || mud->ui_tab_magic_sub_tab == 0) {
         int spell_index = panel_get_list_entry_index(mud->panel_magic,
                                                      mud->control_list_magic);
 
         if (spell_index != -1) {
-            int magic_level = mud->player_skill_current[SKILL_MAGIC];
+            spell_index += first_spell;
+
+            int magic_level = mud->player_skill_current[magic_skill];
 
             if (game_data.spells[spell_index].level > magic_level) {
-                mudclient_show_message(
-                    mud, "Your magic ability is not high enough for this spell",
-                    MESSAGE_TYPE_GAME);
+                const char *ability =
+                    !is_retro ? "magic"
+                    : magic_skill == RETRO_SKILL_EVIL_MAGIC ? "evil magic"
+                                                            : "good magic";
+
+                char message[64] = {0};
+
+                snprintf(message, sizeof(message),
+                         "Your %s ability is not high enough for this spell",
+                         ability);
+
+                mudclient_show_message(mud, message, MESSAGE_TYPE_GAME);
             } else {
                 int i = 0;
 

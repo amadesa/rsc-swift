@@ -1169,6 +1169,43 @@ int32_t *surface_palette_sprite_to_raster(Surface *surface, int sprite_id,
     return pixels;
 }
 
+void surface_free_sprites(Surface *surface, int from, int to) {
+    for (int i = from; i < to; i++) {
+        int32_t *palette = surface->sprite_palette[i];
+
+#ifdef USE_LOCOLOUR
+        if (palette == (int32_t *)ibm_vga_palette) {
+            palette = NULL;
+        }
+#endif
+
+        /* the frames of a TGA sprite sheet share one palette */
+        if (palette != NULL) {
+            for (int j = i + 1; j < to; j++) {
+                if (surface->sprite_palette[j] == palette) {
+                    surface->sprite_palette[j] = NULL;
+                }
+            }
+
+            free(palette);
+        }
+
+        free(surface->surface_pixels[i]);
+        free(surface->sprite_colours[i]);
+
+        surface->surface_pixels[i] = NULL;
+        surface->sprite_colours[i] = NULL;
+        surface->sprite_palette[i] = NULL;
+        surface->sprite_width[i] = 0;
+        surface->sprite_height[i] = 0;
+        surface->sprite_width_full[i] = 0;
+        surface->sprite_height_full[i] = 0;
+        surface->sprite_translate[i] = 0;
+        surface->sprite_translate_x[i] = 0;
+        surface->sprite_translate_y[i] = 0;
+    }
+}
+
 void surface_load_sprite(Surface *surface, int sprite_id) {
 #ifdef RENDER_SW
     surface->surface_pixels[sprite_id] =

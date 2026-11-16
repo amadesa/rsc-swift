@@ -17,6 +17,10 @@ extern int quests_length;
 
 void init_stats_tab_global(void);
 
+/* the skill's name and the number of skills, for the 2001 game's 19 too */
+const char *mudclient_skill_name(mudclient *mud, int skill);
+int mudclient_skill_count(mudclient *mud);
+
 void mudclient_draw_equipment_status(mudclient *mud, int x, int y,
                                      int line_break, int no_menus);
 void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus);

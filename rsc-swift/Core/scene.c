@@ -3152,6 +3152,38 @@ void scene_allocate_textures(Scene *scene, int count, int length_64,
     scene->length_128 = length_128;
 }
 
+void scene_free_textures(Scene *scene) {
+    /* the colours and palettes are the surface's texture sprites */
+    for (int i = 0; i < scene->length_64; i++) {
+        free(scene->texture_colours_64[i]);
+    }
+
+    for (int i = 0; i < scene->length_128; i++) {
+        free(scene->texture_colours_128[i]);
+    }
+
+    free(scene->texture_colours_64);
+    free(scene->texture_colours_128);
+    free(scene->texture_colours);
+    free(scene->texture_palette);
+    free(scene->texture_loaded_number);
+    free(scene->texture_dimension);
+    free(scene->texture_back_transparent);
+    free(scene->texture_pixels);
+
+    scene->texture_colours_64 = NULL;
+    scene->texture_colours_128 = NULL;
+    scene->texture_colours = NULL;
+    scene->texture_palette = NULL;
+    scene->texture_loaded_number = NULL;
+    scene->texture_dimension = NULL;
+    scene->texture_back_transparent = NULL;
+    scene->texture_pixels = NULL;
+    scene->texture_count = 0;
+    scene->length_64 = 0;
+    scene->length_128 = 0;
+}
+
 void scene_define_texture(Scene *scene, int id, int8_t *colours,
                           int32_t *palette, int is_128) {
     scene->texture_colours[id] = colours;

@@ -731,7 +731,7 @@ void mudclient_create_top_mouse_menu(mudclient *mud) {
 
 void mudclient_menu_add_wiki(mudclient *mud, const char *display,
                              const char *page) {
-    if (!mud->options->wiki_lookup) {
+    if (!mudclient_wiki_lookup(mud)) {
         return;
     }
 

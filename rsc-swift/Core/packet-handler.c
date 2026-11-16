@@ -134,6 +134,13 @@ void mudclient_packet_tick(mudclient *mud) {
     }
 
     int8_t *data = mud->incoming_packet;
+
+    if (mud->packet_stream->retro) {
+        /* the 2001 protocol, translated into the handlers below */
+        mudclient_retro_packet(mud, data, size);
+        return;
+    }
+
     ServerOpcode opcode = data[0] & 0xff;
 
 #ifndef NO_ISAAC
@@ -142,6 +149,12 @@ void mudclient_packet_tick(mudclient *mud) {
     }
 #endif
 
+    mudclient_handle_packet(mud, opcode, data, size);
+}
+
+/* data[0] is the opcode's place and the payload starts at data[1] */
+void mudclient_handle_packet(mudclient *mud, int opcode, int8_t *data,
+                             int size) {
     switch (opcode) {
     case SERVER_WORLD_INFO:
         if (mud->local_player_server_index >= PLAYERS_SERVER_MAX) {
@@ -1472,6 +1485,7 @@ void mudclient_packet_tick(mudclient *mud) {
     }
     case SERVER_APPEARANCE: {
         mud->show_appearance_change = 1;
+        mud->appearance_retro_page = 0;
         break;
     }
     case SERVER_SLEEP_OPEN: {

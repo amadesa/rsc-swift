@@ -446,4 +446,7 @@ void options_set_vanilla(Options *options);
 void options_load(Options *options);
 void options_save(Options *options);
 
+/* the data versions options.ini keeps (game-switch.c) */
+void options_saved_versions(Options *options);
+
 #endif

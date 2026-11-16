@@ -275,6 +275,10 @@ void scene_set_camera(Scene *scene, int x, int z, int y, int pitch, int yaw,
                       int roll, int distance);
 void scene_allocate_textures(Scene *scene, int count, int length_64,
                              int length_128);
+
+/* frees what scene_allocate_textures made, for loading another game's
+ * textures (game-switch.c) */
+void scene_free_textures(Scene *scene);
 void scene_define_texture(Scene *scene, int id, int8_t *colours,
                           int32_t *palette, int wide128);
 #ifdef RENDER_SW

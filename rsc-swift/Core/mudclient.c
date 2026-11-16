@@ -257,6 +257,9 @@ void mudclient_resize(mudclient *mud) {
         panel_destroy(mud->panel_appearance);
         free(mud->panel_appearance);
 
+        panel_destroy(mud->panel_appearance_retro);
+        free(mud->panel_appearance_retro);
+
         mudclient_create_appearance_panel(mud);
 
         mud->scene->raster = mud->surface->pixels;
@@ -302,6 +305,11 @@ void mudclient_resize(mudclient *mud) {
         if (mud->panel_appearance != NULL) {
             mud->panel_appearance->offset_x = dynamic_offset_x;
             mud->panel_appearance->offset_y = dynamic_offset_y;
+        }
+
+        if (mud->panel_appearance_retro != NULL) {
+            mud->panel_appearance_retro->offset_x = dynamic_offset_x;
+            mud->panel_appearance_retro->offset_y = dynamic_offset_y;
         }
 
         if (mud->panel_message_tabs != NULL) {
@@ -1018,6 +1026,17 @@ int8_t *mudclient_read_data_file(mudclient *mud, char *file, char *description,
     FILE *archive_stream = fopen(prefixed_file, "rb");
 #endif
 
+#ifdef IOS
+    /* data the app fetched later: the 2001 game's (game-switch.c) */
+    if (archive_stream == NULL && mudclient_ios_data_dir()[0] != '\0') {
+        snprintf(prefixed_file, sizeof(prefixed_file), "%s/%s",
+                 mudclient_ios_data_dir(), file);
+
+        printf("INFO: Loading %s\n", prefixed_file);
+        archive_stream = fopen(prefixed_file, "rb");
+    }
+#endif
+
     /* attempt to read cache from the current working directory first */
     if (archive_stream == NULL) {
         /* cwd failed, now try the xdg home directory... */
@@ -1166,8 +1185,16 @@ void mudclient_load_game_config(mudclient *mud) {
         return;
     }
 
-    game_data_load_data(config_jag, mud->options->members,
-                        mud->options->version_config);
+    if (CONFIG_IS_TEXT(mud->options->version_config)) {
+        /* the 2001 text tables */
+        if (!retro_data_load_config(config_jag)) {
+            mud->error_loading_data = 1;
+        }
+    } else {
+        game_data_load_data(config_jag, mud->options->members,
+                            mud->options->version_config);
+    }
+
     free(config_jag);
 
     /*int8_t *filter_jag = mudclient_read_data_file(
@@ -1293,6 +1320,17 @@ static void mudclient_load_media_dat(mudclient *mud, void *media_jag) {
     free(index_dat);
 }
 
+/* surface_parse_sprite frees its data but surface_parse_sprite_tga doesn't,
+ * so this leaked on each load, which switching to the 2001 game repeats
+ * (game-switch.c) */
+static void free_media(int8_t *data) {
+#ifndef WII
+    free(data);
+#else
+    (void)data;
+#endif
+}
+
 static void mudclient_load_media_tga(mudclient *mud, void *media_jag) {
     void *data;
     size_t len;
@@ -1301,75 +1339,91 @@ static void mudclient_load_media_tga(mudclient *mud, void *media_jag) {
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media,
                          data, len, 1, 1);
+    free_media(data);
 
     data = load_data("inv2.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media + 1,
                          data, len, 1, 6);
+    free_media(data);
 
     data = load_data("bubble.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media + 9,
                          data, len, 1, 1);
+    free_media(data);
 
     if (!mud->options->lowmem) {
         data = load_data("runescape.tga", 0, media_jag, &len);
         assert(data != NULL);
         surface_parse_sprite_tga(mud->surface, mud->sprite_media + 10,
                              data, len, 1, 1);
+        free_media(data);
     }
 
     data = load_data("splat.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media + 11,
                              data, len, 3, 1);
+    free_media(data);
 
     data = load_data("icon.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media + 14,
                              data, len, 4, 2);
+    free_media(data);
 
     if (!mud->options->lowmem) {
         data = load_data("hbar.tga", 0, media_jag, &len);
         assert(data != NULL);
         surface_parse_sprite_tga(mud->surface, mud->sprite_media + 22,
                                  data, len, 1, 1);
+        free_media(data);
     }
 
     data = load_data("hbar2.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media + 23,
                              data, len, 1, 1);
+    free_media(data);
 
     data = load_data("compass.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_media + 24,
                              data, len, 1, 1);
+    free_media(data);
 
+    /* not in the 2001 media */
     data = load_data("buttons.tga", 0, media_jag, &len);
-    assert(data != NULL);
-    surface_parse_sprite_tga(mud->surface, mud->sprite_media + 25,
-                             data, len, 1, 2);
+    if (data != NULL) {
+        surface_parse_sprite_tga(mud->surface, mud->sprite_media + 25,
+                                 data, len, 1, 2);
+        free_media(data);
+    }
 
     data = load_data("scrollbar.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_util,
                              data, len, 2, 1);
+    free_media(data);
 
     data = load_data("corners.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_util + 2,
                              data, len, 4, 1);
+    free_media(data);
 
     data = load_data("arrows.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_util + 6,
                          data, len, 2, 1);
+    free_media(data);
 
     data = load_data("projectile.tga", 0, media_jag, &len);
     assert(data != NULL);
     surface_parse_sprite_tga(mud->surface, mud->sprite_projectile,
                              data, len, 3, 1);
+    free_media(data);
 
     int sprite_count = game_data.item_sprite_count;
 
@@ -1393,6 +1447,7 @@ static void mudclient_load_media_tga(mudclient *mud, void *media_jag) {
 
         surface_parse_sprite_tga(mud->surface, mud->sprite_item + (i - 1) * 30,
                              data, len, 10, i < 7 ? 3 : 1);
+        free_media(data);
     }
 }
 
@@ -1555,6 +1610,13 @@ void mudclient_load_entities(mudclient *mud) {
             if (older_is_better) {
                 surface_parse_sprite_tga(mud->surface, animation_index,
                                          animation_dat, len, 15, 1);
+
+#ifndef WII
+                /* surface_parse_sprite frees its data but this doesn't, so
+                 * it leaked on each load, which switching to the 2001 game
+                 * repeats (game-switch.c) */
+                free(animation_dat);
+#endif
             } else {
                 surface_parse_sprite(mud->surface, animation_index,
                                      animation_dat, animation_index_dat, 15);
@@ -1587,6 +1649,9 @@ void mudclient_load_entities(mudclient *mud) {
                 if (older_is_better) {
                     surface_parse_sprite_tga(mud->surface, animation_index + 15,
                                              a_dat, len, 3, 1);
+#ifndef WII
+                    free(a_dat);
+#endif
                 } else {
                     surface_parse_sprite(mud->surface, animation_index + 15,
                                          a_dat, a_index_dat, 3);
@@ -1609,6 +1674,9 @@ void mudclient_load_entities(mudclient *mud) {
                 if (older_is_better) {
                     surface_parse_sprite_tga(mud->surface, animation_index + 18,
                                              f_dat, len, 9, 1);
+#ifndef WII
+                    free(f_dat);
+#endif
                 } else {
                     surface_parse_sprite(mud->surface, animation_index + 18,
                                          f_dat, f_index_dat, 9);
@@ -1661,7 +1729,16 @@ void mudclient_load_textures(mudclient *mud) {
         return;
     }
 
-    int8_t *index_dat = load_data("index.dat", 0, textures_jag, NULL);
+    /* the 2001 textures are listed in their own file, as TGA images */
+    int is_tga = TEXTURES_IS_TGA(mud->options->version_textures);
+
+    if (is_tga && !retro_data_load_texture_names(textures_jag)) {
+        mud->error_loading_data = 1;
+        return;
+    }
+
+    int8_t *index_dat =
+        is_tga ? NULL : load_data("index.dat", 0, textures_jag, NULL);
 
     scene_allocate_textures(mud->scene, game_data.texture_count, 7, 11);
 
@@ -1675,15 +1752,28 @@ void mudclient_load_textures(mudclient *mud) {
             continue;
         }
 #endif
-        sprintf(file_name, "%s.dat", game_data.textures[i].name);
+        sprintf(file_name, "%s.%s", game_data.textures[i].name,
+                is_tga ? "tga" : "dat");
 
-        int8_t *texture_dat = load_data(file_name, 0, textures_jag, NULL);
+        size_t texture_len = 0;
+        int8_t *texture_dat =
+            load_data(file_name, 0, textures_jag, &texture_len);
         if (texture_dat == NULL) {
             continue;
         }
 
-        surface_parse_sprite(surface, mud->sprite_texture, texture_dat,
-                             index_dat, 1);
+        if (is_tga) {
+            surface_parse_sprite_tga(surface, mud->sprite_texture, texture_dat,
+                                     texture_len, 1, 1);
+
+#ifndef WII
+            /* surface_parse_sprite frees its data; this doesn't */
+            free(texture_dat);
+#endif
+        } else {
+            surface_parse_sprite(surface, mud->sprite_texture, texture_dat,
+                                 index_dat, 1);
+        }
 
         surface_draw_box(surface, 0, 0, 128, 128, MAGENTA);
         surface_draw_sprite(surface, 0, 0, mud->sprite_texture);
@@ -1777,21 +1867,27 @@ void mudclient_load_models(mudclient *mud) {
         return;
     }
 
+    /* the 2001 models are .ob2 text */
+    int is_ob2 = MODELS_IS_OB2(mud->options->version_models);
+    const char *extension = is_ob2 ? "ob2" : "ob3";
+
     for (int i = 0; i < game_data.model_count; i++) {
         char *model_name = game_data.model_name[i];
 
         char file_name[strlen(model_name) + 5];
-        sprintf(file_name, "%s.ob3", model_name);
+        sprintf(file_name, "%s.%s", model_name, extension);
 
         uint32_t offset = get_data_file_offset(file_name, models_jag);
         uint32_t len = get_data_file_length(file_name, models_jag);
 
         GameModel *game_model = malloc(sizeof(GameModel));
 
-        if (offset != 0) {
+        if (offset != 0 && is_ob2) {
+            game_model_new_ob2(game_model, models_jag + offset, len);
+        } else if (offset != 0) {
             game_model_new_ob3(game_model, models_jag + offset, len);
         } else {
-            mud_error("missing model \"%s.ob3\" from %s\n", model_name,
+            mud_error("missing model \"%s\" from %s\n", file_name,
                       models_filename);
 
             game_model_new_alloc(game_model, 1, 1);
@@ -1903,7 +1999,9 @@ void mudclient_load_maps(mudclient *mud) {
     mud->world->map_pack = mudclient_read_data_file(
         mud, jag, "map", 70);
 
-    if (mud->options->members) {
+    /* the 2001 game has no members' maps */
+    if (mud->options->members &&
+        !CONFIG_IS_TEXT(mud->options->version_config)) {
         snprintf(jag, sizeof(jag), "maps%d.mem", mud->options->version_maps);
         mud->world->member_map_pack = mudclient_read_data_file(
             mud, jag, "members map", 75);
@@ -2101,6 +2199,12 @@ void mudclient_login(mudclient *mud, char *username, char *password,
         strcpy(mud->password, password);
     }
 
+    /* the world may run the other game, whose data may need fetching
+     * first (game-switch.c) */
+    if (!reconnecting && !mudclient_prepare_game(mud)) {
+        return;
+    }
+
     char formatted_username[USERNAME_LENGTH + 1] = {0};
     format_auth_string(username, USERNAME_LENGTH, formatted_username);
 
@@ -2135,6 +2239,30 @@ void mudclient_login(mudclient *mud, char *username, char *password,
 
     if (mud->packet_stream->closed) {
         goto login_fail;
+    }
+
+    int response = -1;
+
+    if (mudclient_is_retro(mud)) {
+        /* the May 2001 login: no session or encryption, the password as
+         * text (2001Scape) */
+        mud->packet_stream->retro = 1;
+
+        packet_stream_new_packet(mud->packet_stream,
+                                 reconnecting ? CLIENT_RETRO_RECONNECT
+                                              : CLIENT_RETRO_LOGIN);
+        packet_stream_put_long(mud->packet_stream,
+                               encode_username(formatted_username));
+        packet_stream_put_string(mud->packet_stream, formatted_password);
+        packet_stream_put_short(mud->packet_stream, RETRO_VERSION);
+
+        if (packet_stream_flush_packet(mud->packet_stream) < 0) {
+            goto login_fail;
+        }
+
+        packet_stream_get_short(mud->packet_stream);
+        response = packet_stream_get_byte(mud->packet_stream);
+        goto login_response;
     }
 
 #ifdef REVISION_177
@@ -2188,7 +2316,7 @@ void mudclient_login(mudclient *mud, char *username, char *password,
 
     packet_stream_get_byte(mud->packet_stream);
 
-    int response = packet_stream_get_byte(mud->packet_stream);
+    response = packet_stream_get_byte(mud->packet_stream);
 #else
 #ifdef _3DS
     mud_log("Verb: Session id: %lld\n", session_id); /* ? */
@@ -2214,9 +2342,10 @@ void mudclient_login(mudclient *mud, char *username, char *password,
         goto login_fail;
     }
 
-    int response = packet_stream_get_byte(mud->packet_stream);
+    response = packet_stream_get_byte(mud->packet_stream);
 #endif
 
+login_response:
     mud_log("Login response: %d\n", response);
 
     if (response == 0 || response == 1 || response == 25) {
@@ -2634,6 +2763,9 @@ void mudclient_update_fov(mudclient *mud) {
 #endif
 
 void mudclient_start_game(mudclient *mud) {
+    /* the last world's game (game-switch.c) */
+    mudclient_choose_startup_game(mud);
+
     mudclient_load_game_config(mud);
 
     if (mud->error_loading_data) {
@@ -3666,6 +3798,10 @@ void mudclient_handle_inputs(mudclient *mud) {
 
     if (mud->logged_in == 0) {
         mud->mouse_action_timeout = 0;
+
+        /* the selected world's game (game-switch.c) */
+        mudclient_update_game(mud);
+
         mudclient_handle_login_screen_input(mud);
     } else if (mud->logged_in == 1) {
         mud->mouse_action_timeout++;
@@ -5193,6 +5329,15 @@ void mudclient_on_resize(mudclient *mud) {
     mudclient_resize(mud);
 }
 
+
+/* the May 2001 game (2001Scape): its data and protocol */
+int mudclient_is_retro(mudclient *mud) {
+    return CONFIG_IS_TEXT(mud->options->version_config);
+}
+
+int mudclient_wiki_lookup(mudclient *mud) {
+    return mud->options->wiki_lookup && !mudclient_is_retro(mud);
+}
 
 int mudclient_is_touch(mudclient *mud) {
     (void)(mud);

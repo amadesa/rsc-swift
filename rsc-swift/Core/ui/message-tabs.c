@@ -112,7 +112,7 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
         }
     }
 
-    if (!is_touch && !is_compact && mud->options->wiki_lookup &&
+    if (!is_touch && !is_compact && mudclient_wiki_lookup(mud) &&
         mud->options->version_media > 42) {
         surface_draw_box(mud->surface, x + 416, y + 3, 84, 9, MESSAGE_TAB_WIKI);
         surface_draw_box(mud->surface, x + 414, y + 7, 88, 5, MESSAGE_TAB_WIKI);
@@ -123,16 +123,30 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
         x = 9 + MUD_SAFE_LEFT;
         y = 24 + MUD_SAFE_TOP;
 
-        for (int i = 0; i < 4 + (!is_compact); i++) {
+        /* the fifth is wiki lookup or report abuse, which the 2001 game
+         * doesn't have */
+        int has_fifth = !is_compact && (mud->options->version_media > 42 ||
+                                         mudclient_wiki_lookup(mud));
+
+        for (int i = 0; i < 4 + has_fifth; i++) {
             int button_x = x + (i * button_width) + (i == 4 ? 1 : 0);
             int button_y = y - 13;
 
-            surface_draw_sprite_scale_mask(
-                mud->surface, button_x, button_y, button_width - 10, 19,
-                mud->sprite_media + 39,
-                i == 4 && !mud->options->wiki_lookup ? 0xff1b00 : 0x00c1ff);
+            int button_colour =
+                i == 4 && !mudclient_wiki_lookup(mud) ? 0xff1b00 : 0x00c1ff;
 
-            if (mud->options->wiki_lookup && i == 4) {
+            /* the button sprite is only in media 59 and later */
+            if (mud->surface->sprite_width[mud->sprite_media + 39] > 0) {
+                surface_draw_sprite_scale_mask(
+                    mud->surface, button_x, button_y, button_width - 10, 19,
+                    mud->sprite_media + 39, button_colour);
+            } else {
+                surface_draw_box_alpha(mud->surface, button_x + 2,
+                                       button_y + 2, button_width - 14, 15,
+                                       button_colour, 128);
+            }
+
+            if (mudclient_wiki_lookup(mud) && i == 4) {
                 surface_draw_box(mud->surface, button_x + 4, button_y + 4,
                                  button_width - 18, 12, 0x3a779d);
             }
@@ -200,9 +214,9 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
         x + (button_width * 3) + 1, y, FONT_REGULAR_11, text_colour);
 
     if (!is_compact &&
-        (mud->options->version_media > 42 || mud->options->wiki_lookup)) {
+        (mud->options->version_media > 42 || mudclient_wiki_lookup(mud))) {
         surface_draw_string_centre(mud->surface,
-            mud->options->wiki_lookup ? "Wiki lookup" : "Report abuse",
+            mudclient_wiki_lookup(mud) ? "Wiki lookup" : "Report abuse",
             x + (button_width * 4) + 3, y, FONT_REGULAR_11,
             mud->selected_wiki ? MESSAGE_TAB_ORANGE : WHITE);
     }
@@ -211,6 +225,43 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
 /* the on-screen keyboard button used on touch screens. drawing and tapping
  * must use the same position (they used to disagree when it was on the
  * right, so the visible button did nothing) */
+/* the 2001 game's media has no keyboard sprite, so it gets a plain button
+ * the same size */
+#define KEYBOARD_BUTTON_WIDTH 40
+#define KEYBOARD_BUTTON_HEIGHT 25
+
+void mudclient_get_keyboard_button_size(mudclient *mud, int *width,
+                                        int *height) {
+    int sprite_id = mud->sprite_media + 40;
+
+    if (mud->surface->sprite_width[sprite_id] > 0) {
+        *width = mud->surface->sprite_width[sprite_id];
+        *height = mud->surface->sprite_height[sprite_id];
+    } else {
+        *width = KEYBOARD_BUTTON_WIDTH;
+        *height = KEYBOARD_BUTTON_HEIGHT;
+    }
+}
+
+void mudclient_draw_keyboard_button(mudclient *mud, int x, int y) {
+    int sprite_id = mud->sprite_media + 40;
+
+    if (mud->surface->sprite_width[sprite_id] > 0) {
+        surface_draw_sprite(mud->surface, x, y, sprite_id);
+        return;
+    }
+
+    surface_draw_box_alpha(mud->surface, x, y, KEYBOARD_BUTTON_WIDTH,
+                           KEYBOARD_BUTTON_HEIGHT, BLACK, 160);
+
+    surface_draw_border(mud->surface, x, y, KEYBOARD_BUTTON_WIDTH,
+                        KEYBOARD_BUTTON_HEIGHT, WHITE);
+
+    surface_draw_string_centre(mud->surface, "Chat",
+                               x + KEYBOARD_BUTTON_WIDTH / 2, y + 17,
+                               FONT_BOLD_12, WHITE);
+}
+
 void mudclient_get_keyboard_button_position(mudclient *mud, int *x, int *y) {
     /* default to left */
     *x = 9 + MUD_SAFE_LEFT;
@@ -295,8 +346,8 @@ void mudclient_draw_chat_message_tabs_panel(mudclient *mud) {
         mudclient_get_keyboard_button_position(mud, &keyboard_button_x,
                                                &keyboard_button_y);
 
-        surface_draw_sprite(mud->surface, keyboard_button_x, keyboard_button_y,
-                            mud->sprite_media + 40);
+        mudclient_draw_keyboard_button(mud, keyboard_button_x,
+                                       keyboard_button_y);
     }
 }
 
@@ -379,7 +430,7 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
                 ->control_list_position[mud->control_text_list_private] =
                 999999;
         } else if (!is_compact && tab_x > 417 && tab_x < 497) {
-            if (mud->options->wiki_lookup) {
+            if (mudclient_wiki_lookup(mud)) {
                 mud->selected_wiki = !mud->selected_wiki;
             }
 
@@ -400,6 +451,12 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
 
         mudclient_get_keyboard_button_position(mud, &keyboard_button_x,
                                                &keyboard_button_y);
+
+        int keyboard_button_width = 0;
+        int keyboard_button_height = 0;
+
+        mudclient_get_keyboard_button_size(mud, &keyboard_button_width,
+                                           &keyboard_button_height);
 
         panel_handle_mouse(mud->panel_message_tabs, mudclient_finger_1_x,
                            mudclient_finger_1_y, mud->last_mouse_button_down,
@@ -436,13 +493,9 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
         int is_within_button_input =
             !is_keyboard_button_hidden &&
             (mud->mouse_x >= keyboard_button_x &&
-             mud->mouse_x <=
-                 keyboard_button_x +
-                     mud->surface->sprite_width[mud->sprite_media + 40] &&
+             mud->mouse_x <= keyboard_button_x + keyboard_button_width &&
              mud->mouse_y >= keyboard_button_y &&
-             mud->mouse_y <=
-                 keyboard_button_y +
-                     mud->surface->sprite_height[mud->sprite_media + 40]);
+             mud->mouse_y <= keyboard_button_y + keyboard_button_height);
 
         if (!mud->show_right_click_menu && mud->last_mouse_button_down == 1 &&
             (is_within_chat_input || is_within_button_input)) {
@@ -493,23 +546,26 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
             mudclient_send_chat_message(mud, chat_message_encoded,
                                         encoded_length);
 
-            message =
-                chat_message_decode(chat_message_encoded, 0, encoded_length);
+            /* the 2001 server sends our own chat back to us */
+            if (!mudclient_is_retro(mud)) {
+                message = chat_message_decode(chat_message_encoded, 0,
+                                              encoded_length);
 
-            /*if (mud->options.word_filter) {
-                message = word_filter_filter(message);
-            }*/
+                /*if (mud->options.word_filter) {
+                    message = word_filter_filter(message);
+                }*/
 
-            mud->local_player->message_timeout = 150;
-            strcpy(mud->local_player->message, message);
+                mud->local_player->message_timeout = 150;
+                strcpy(mud->local_player->message, message);
 
-            char formatted_message[strlen(message) +
-                                   strlen(mud->local_player->name) + 3];
+                char formatted_message[strlen(message) +
+                                       strlen(mud->local_player->name) + 3];
 
-            sprintf(formatted_message, "%s: %s", mud->local_player->name,
-                    message);
+                sprintf(formatted_message, "%s: %s", mud->local_player->name,
+                        message);
 
-            mudclient_show_message(mud, formatted_message, MESSAGE_TYPE_CHAT);
+                mudclient_show_message(mud, formatted_message, MESSAGE_TYPE_CHAT);
+            }
         }
 
         panel_update_text(mud->panel_message_tabs, mud->control_text_list_all,

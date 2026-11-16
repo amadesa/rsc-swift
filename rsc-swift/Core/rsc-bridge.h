@@ -79,11 +79,19 @@ typedef void (*RscLoginCallback)(void *context, const char *username,
 typedef void (*RscSoundCallback)(void *context, const int16_t *pcm,
                                  int samples, int sample_rate);
 
+/* asks the app to fetch the May 2001 game's data into data_dir */
+typedef void (*RscRequestRetroDataCallback)(void *context,
+                                            const char *data_dir);
+
 typedef struct {
     /* directory containing config85.jag, media59.jag etc. */
     const char *cache_dir;
     /* writable directory for options.ini and worlds.cfg */
     const char *config_dir;
+    /* writable directory for game data fetched later: the May 2001 game's
+     * (config17.jag, media12.jag, entity3.jag, textures5.jag, models6.jag,
+     * maps14.jag), which 2001Scape's worlds need. may be NULL */
+    const char *data_dir;
     /* initial game resolution in pixels */
     int width;
     int height;
@@ -103,6 +111,10 @@ typedef struct {
     /* "Accounts" on the welcome screen, shown when this is set (not on the
      * watch), opens the app's list of saved accounts */
     RscRequestWorldCallback on_request_accounts;
+    /* a 2001 game world was chosen and its data isn't in cache_dir or
+     * data_dir: fetch the files above into data_dir, then call
+     * rsc_retro_data_ready. called on the game thread */
+    RscRequestRetroDataCallback on_request_retro_data;
 } RscConfig;
 
 /* start the game thread. may only be called once */
@@ -139,11 +151,12 @@ void rsc_key_up(int code);
 /*
  * add a world to the login screen's world list and select it. the RSA
  * exponent and modulus are hex, 0-padded to a multiple of 8 characters.
- * register_url may be NULL or empty
+ * register_url may be NULL or empty. retro is 1 for a world on the May
+ * 2001 game (2001Scape), which game.openrsc.com:43593 is anyway
  */
 void rsc_add_world(const char *name, const char *host, int port,
                    const char *rsa_exponent, const char *rsa_modulus,
-                   const char *register_url);
+                   const char *register_url, int retro);
 
 /* remove a world from the world list (the last one is always kept) */
 void rsc_remove_world(int index);
@@ -189,6 +202,8 @@ typedef struct {
     int idle_logout_seconds;
     /* the account logged in to */
     char username[21];
+    /* playing the May 2001 game, which has no prayer points or fatigue */
+    int retro;
 } RscStatus;
 
 /* the player's current stats, read from any thread */
@@ -238,6 +253,9 @@ typedef struct {
     int world_count;
     /* the selected world's row */
     int world_selected;
+    /* the 2001 game's data, for a 2001Scape world: 0 here or not needed, 1
+     * downloading, 2 the download failed */
+    int retro_data;
 } RscLoginState;
 
 /* the login screen's state, from any thread */
@@ -259,6 +277,13 @@ void rsc_set_world_list_scroll(float pixels);
 
 /* select the world in this row of the list, as tapping it would */
 void rsc_choose_world(int index);
+
+/* whether the world in this row runs the May 2001 game (2001Scape) */
+int rsc_world_is_retro(int index);
+
+/* the 2001 game's data is in data_dir (success 1), or couldn't be fetched
+ * (0), after on_request_retro_data */
+void rsc_retro_data_ready(int success);
 
 /* change and remember the combat style, like tapping it in the game */
 void rsc_set_combat_style(int style);

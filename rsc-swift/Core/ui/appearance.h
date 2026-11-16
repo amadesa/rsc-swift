@@ -21,7 +21,11 @@
 #define APPEARANCE_CHARACTER_WIDTH 64
 #define APPEARANCE_CHARACTER_HEIGHT 102
 
+/* the 2001 game's character type and pk mode choices */
+#define APPEARANCE_RETRO_CHOICE_WIDTH 150
+
 void mudclient_create_appearance_panel(mudclient *mud);
+void mudclient_create_appearance_retro_panel(mudclient *mud);
 void mudclient_handle_appearance_panel_input(mudclient *mud);
 void mudclient_draw_appearance_panel(mudclient *mud);
 

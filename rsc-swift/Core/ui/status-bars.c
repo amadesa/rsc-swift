@@ -172,9 +172,15 @@ int mudclient_bottom_bar_inset(mudclient *mud) {
  * numbers, here centred on the blue bar along the bottom. the opponent's
  * hits aren't shown, so the row doesn't change when a fight starts */
 static void draw_docked_status_bars(mudclient *mud) {
-    int show_fatigue = !mud->is_sleeping && mud->options->fatigue;
+    /* the 2001 game has no prayer points or fatigue */
+    int is_retro = mudclient_is_retro(mud);
 
-    int count = 2 + show_fatigue;
+    int show_fatigue =
+        !mud->is_sleeping && mud->options->fatigue && !is_retro;
+
+    int show_prayer = !is_retro;
+
+    int count = 1 + show_prayer + show_fatigue;
 
     /* level with the bottom of the blue bar (message-tabs.c) */
     int inset = mudclient_bottom_bar_inset(mud);
@@ -202,11 +208,13 @@ static void draw_docked_status_bars(mudclient *mud) {
 
     x += bar_width + padding;
 
-    draw_docked_bar(mud, x, y, bar_width, 0xa0a0d2,
-                    max_prayer > 0 && prayer * 100 / max_prayer < 30, prayer,
-                    max_prayer);
+    if (show_prayer) {
+        draw_docked_bar(mud, x, y, bar_width, 0xa0a0d2,
+                        max_prayer > 0 && prayer * 100 / max_prayer < 30,
+                        prayer, max_prayer);
 
-    x += bar_width + padding;
+        x += bar_width + padding;
+    }
 
     if (show_fatigue) {
         int fatigue = mud->stat_fatigue * 100 / 750;
@@ -290,12 +298,17 @@ void mudclient_draw_status_bars(mudclient *mud) {
         x += status_bar_width + (is_touch ? 4 : 3);
     }
 
-    int max_prayer = mud->player_skill_base[SKILL_PRAYER];
-    int current_prayer = mud->player_skill_current[SKILL_PRAYER];
+    int is_retro = mudclient_is_retro(mud);
 
-    surface_draw_status_bar(mud->surface, max_prayer, current_prayer, "Prayer",
-                            x, y, status_bar_width, status_bar_height, BLACK,
-                            CYAN, 0);
+    /* the 2001 game has no prayer points */
+    if (!is_retro) {
+        int max_prayer = mud->player_skill_base[SKILL_PRAYER];
+        int current_prayer = mud->player_skill_current[SKILL_PRAYER];
+
+        surface_draw_status_bar(mud->surface, max_prayer, current_prayer,
+                                "Prayer", x, y, status_bar_width,
+                                status_bar_height, BLACK, CYAN, 0);
+    }
 
     if (is_touch) {
         x += status_bar_width + mud->surface->width * 0.293f + 9;
@@ -331,7 +344,7 @@ void mudclient_draw_status_bars(mudclient *mud) {
         }
     }
 
-    if (!mud->is_sleeping && mud->options->fatigue) {
+    if (!mud->is_sleeping && mud->options->fatigue && !is_retro) {
         if (is_touch) {
             y = ui_y;
         } else {
@@ -367,8 +380,14 @@ void mudclient_draw_status_bars(mudclient *mud) {
 
 static void draw_skill_effects(mudclient *mud, int x, int y) {
     /* Display drained / boosted skills */
-    for (int i = 0; i < PLAYER_SKILL_COUNT; ++i) {
-        if (i == SKILL_PRAYER || i == SKILL_HITS) {
+    int is_retro = mudclient_is_retro(mud);
+
+    for (int i = 0; i < mudclient_skill_count(mud); ++i) {
+        if ((i == SKILL_PRAYER && !is_retro) || i == SKILL_HITS) {
+            continue;
+        }
+
+        if (mud->player_skill_base[i] == 0) {
             continue;
         }
 
@@ -402,7 +421,8 @@ static void draw_skill_effects(mudclient *mud, int x, int y) {
         char formatted_effect[32] = {0};
 
         snprintf(formatted_effect, sizeof(formatted_effect), "%s%s: %d/%d",
-                 colour, skill_names[i], mud->player_skill_current[i],
+                 colour, mudclient_skill_name(mud, i),
+                 mud->player_skill_current[i],
                  mud->player_skill_base[i]);
 
         surface_draw_string_right(mud->surface, formatted_effect, x, y,

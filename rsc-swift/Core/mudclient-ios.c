@@ -30,7 +30,8 @@ typedef enum {
     EVENT_MENU_CHOICE,
     EVENT_LOGIN,
     EVENT_LOGIN_SCREEN,
-    EVENT_CHOOSE_WORLD
+    EVENT_CHOOSE_WORLD,
+    EVENT_RETRO_DATA
 } EventType;
 
 typedef struct {
@@ -40,6 +41,7 @@ typedef struct {
     char rsa_exponent[512];
     char rsa_modulus[512];
     char register_url[256];
+    int retro;
 } PendingWorld;
 
 typedef struct {
@@ -105,6 +107,7 @@ static char login_status[96];
 static char login_status_bottom[96];
 static char cache_dir[PATH_MAX] = {0};
 static char config_dir[PATH_MAX] = {0};
+static char data_dir[PATH_MAX] = {0};
 
 /* touch state, same as mudclient-sdl.c */
 static int mudclient_horizontal_drag = 0;
@@ -190,9 +193,12 @@ void rsc_start(const RscConfig *new_config) {
 
     snprintf(cache_dir, sizeof(cache_dir), "%s", new_config->cache_dir);
     snprintf(config_dir, sizeof(config_dir), "%s", new_config->config_dir);
+    snprintf(data_dir, sizeof(data_dir), "%s",
+             new_config->data_dir != NULL ? new_config->data_dir : "");
 
     config.cache_dir = cache_dir;
     config.config_dir = config_dir;
+    config.data_dir = data_dir;
 
     requested_width = new_config->width;
     requested_height = new_config->height;
@@ -302,7 +308,7 @@ void rsc_key_up(int code) {
 
 void rsc_add_world(const char *name, const char *host, int port,
                    const char *rsa_exponent, const char *rsa_modulus,
-                   const char *register_url) {
+                   const char *register_url, int retro) {
     PendingWorld *world = calloc(1, sizeof(PendingWorld));
 
     snprintf(world->name, sizeof(world->name), "%s", name);
@@ -314,6 +320,7 @@ void rsc_add_world(const char *name, const char *host, int port,
              rsa_modulus);
     snprintf(world->register_url, sizeof(world->register_url), "%s",
              register_url != NULL ? register_url : "");
+    world->retro = retro;
 
     push_event((Event){.type = EVENT_ADD_WORLD, .world = world});
 }
@@ -324,6 +331,16 @@ void rsc_remove_world(int index) {
 
 void rsc_choose_world(int index) {
     push_event((Event){.type = EVENT_CHOOSE_WORLD, .code = index});
+}
+
+int rsc_world_is_retro(int index) {
+    /* the list is only changed on the game thread, between frames; reading
+     * a flag is harmless */
+    return worldlist_is_retro(index);
+}
+
+void rsc_retro_data_ready(int success) {
+    push_event((Event){.type = EVENT_RETRO_DATA, .code = success});
 }
 
 /* a float is written whole on the platforms this runs on, and a frame drawn
@@ -393,8 +410,13 @@ void rsc_get_status(RscStatus *status) {
     snprintf(status->username, sizeof(status->username), "%s", mud->username);
     status->hits = mud->player_skill_current[SKILL_HITS];
     status->max_hits = mud->player_skill_base[SKILL_HITS];
-    status->prayer = mud->player_skill_current[SKILL_PRAYER];
-    status->max_prayer = mud->player_skill_base[SKILL_PRAYER];
+    status->retro = mudclient_is_retro(mud);
+
+    if (!status->retro) {
+        status->prayer = mud->player_skill_current[SKILL_PRAYER];
+        status->max_prayer = mud->player_skill_base[SKILL_PRAYER];
+    }
+
     status->fatigue = mud->stat_fatigue;
     status->combat_style = mud->combat_style;
     status->ui_tab = mud->show_ui_tab;
@@ -459,6 +481,10 @@ static void finish_login(void) {
     pthread_mutex_unlock(&event_lock);
 }
 
+/* an rsc_login waiting for the 2001 data, which finishes once it's fetched
+ * (EVENT_RETRO_DATA), so the apps keep showing it as logging in */
+static int login_waiting_for_data = 0;
+
 static void handle_login(mudclient *mud, PendingLogin *login) {
     if (mud->logged_in || mud->panel_login_existing_user == NULL) {
         finish_login();
@@ -489,6 +515,11 @@ static void handle_login(mudclient *mud, PendingLogin *login) {
 
     /* mud->password keeps it for reconnecting */
     memset(mud->login_pass, 0, sizeof(mud->login_pass));
+
+    if (mud->login_after_retro_data) {
+        login_waiting_for_data = 1;
+        return;
+    }
 
     finish_login();
 }
@@ -533,6 +564,7 @@ void rsc_get_login_state(RscLoginState *state) {
 
     state->ready = 1;
     state->screen = mud->login_screen;
+    state->retro_data = mud->retro_data_state;
     state->options_open = mud->show_additional_options;
 
     snprintf(state->world_host, sizeof(state->world_host), "%s", mud->server);
@@ -674,6 +706,17 @@ void mudclient_ios_show_menu(mudclient *mud) {
 }
 
 const char *mudclient_ios_cache_dir(void) { return cache_dir; }
+
+const char *mudclient_ios_data_dir(void) { return data_dir; }
+
+void mudclient_ios_request_retro_data(void) {
+    if (config.on_request_retro_data != NULL && data_dir[0] != '\0') {
+        config.on_request_retro_data(config.context, data_dir);
+    } else {
+        /* nowhere to put it */
+        push_event((Event){.type = EVENT_RETRO_DATA, .code = 0});
+    }
+}
 
 const char *mudclient_ios_config_dir(void) { return config_dir; }
 
@@ -1132,7 +1175,7 @@ void mudclient_poll_events(mudclient *mud) {
                 worldlist_add(mud, event.world->name, event.world->host,
                               event.world->port, event.world->rsa_exponent,
                               event.world->rsa_modulus,
-                              event.world->register_url);
+                              event.world->register_url, event.world->retro);
             }
 
             free(event.world);
@@ -1147,6 +1190,14 @@ void mudclient_poll_events(mudclient *mud) {
         case EVENT_REMOVE_WORLD:
             if (mud->panel_login_worldlist != NULL) {
                 worldlist_remove(mud, event.code);
+            }
+            break;
+        case EVENT_RETRO_DATA:
+            mudclient_retro_data_ready(mud, event.code);
+
+            if (login_waiting_for_data) {
+                login_waiting_for_data = 0;
+                finish_login();
             }
             break;
         case EVENT_CHOOSE_WORLD:

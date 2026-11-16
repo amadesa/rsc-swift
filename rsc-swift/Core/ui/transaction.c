@@ -1,5 +1,27 @@
 #include "transaction.h"
 
+/* the accept or decline button. the 2001 game's media has no buttons
+ * sprite (mudclient_load_media_tga), so it gets a plain one the same size */
+static void draw_transaction_button(mudclient *mud, int x, int y,
+                                    int sprite_id) {
+    if (mud->surface->sprite_width[sprite_id] > 0) {
+        surface_draw_sprite(mud->surface, x, y, sprite_id);
+        return;
+    }
+
+    int is_accept = sprite_id == mud->sprite_media + 25;
+
+    surface_draw_box(mud->surface, x, y, TRANSACTION_BUTTON_WIDTH,
+                     TRANSACTION_BUTTON_HEIGHT, is_accept ? 0x008000 : 0x800000);
+
+    surface_draw_border(mud->surface, x, y, TRANSACTION_BUTTON_WIDTH,
+                        TRANSACTION_BUTTON_HEIGHT, WHITE);
+
+    surface_draw_string_centre(mud->surface, is_accept ? "Accept" : "Decline",
+                               x + TRANSACTION_BUTTON_WIDTH / 2, y + 15,
+                               FONT_BOLD_12, WHITE);
+}
+
 void mudclient_offer_transaction_item(mudclient *mud,
                                       ClientOpcode update_opcode, int item_id,
                                       int item_amount) {
@@ -596,9 +618,9 @@ void mudclient_draw_transaction(mudclient *mud, int dialog_x, int dialog_y,
                             dialog_y + (inventory_y - 3), FONT_BOLD_14, WHITE);
     }
 
-    surface_draw_sprite(mud->surface, dialog_x + transaction_decline_x,
-                        dialog_y + transaction_button_y,
-                        mud->sprite_media + 26);
+    draw_transaction_button(mud, dialog_x + transaction_decline_x,
+                            dialog_y + transaction_button_y,
+                            mud->sprite_media + 26);
 
     if (mud->transaction_recipient_accepted) {
         int text_x = dialog_x + transaction_accept_x + (is_compact ? 98 : 124);
@@ -621,9 +643,9 @@ void mudclient_draw_transaction(mudclient *mud, int dialog_x, int dialog_y,
             mud->surface, "other player", dialog_x + transaction_accept_x + 35,
             dialog_y + transaction_button_y + 18, FONT_BOLD_12, WHITE);
     } else {
-        surface_draw_sprite(mud->surface, dialog_x + transaction_accept_x,
-                            dialog_y + transaction_button_y,
-                            mud->sprite_media + 25);
+        draw_transaction_button(mud, dialog_x + transaction_accept_x,
+                                dialog_y + transaction_button_y,
+                                mud->sprite_media + 25);
     }
 
     /* our inventory */
@@ -898,13 +920,12 @@ void mudclient_draw_transaction_confirm(mudclient *mud, int dialog_x,
     if (!mud->transaction_confirm_accepted) {
         int offset_y = is_compact ? 8 : 0;
 
-        surface_draw_sprite(mud->surface, dialog_x + (is_compact ? 4 : 83),
-                            dialog_y + transaction_button_y + offset_y,
-                            mud->sprite_media + 25);
+        draw_transaction_button(mud, dialog_x + (is_compact ? 4 : 83),
+                                dialog_y + transaction_button_y + offset_y,
+                                mud->sprite_media + 25);
 
-        surface_draw_sprite(
-            mud->surface,
-            dialog_x + (is_compact ? transaction_width - 73 : 317),
+        draw_transaction_button(
+            mud, dialog_x + (is_compact ? transaction_width - 73 : 317),
             dialog_y + transaction_button_y + offset_y, mud->sprite_media + 26);
     } else {
         surface_draw_string_centre(mud->surface, "Waiting for other player...",

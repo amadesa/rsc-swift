@@ -1,4 +1,5 @@
 #include "packet-stream.h"
+#include "retro-packets.h"
 
 #ifdef IOS
 #include "relay-transport.h"
@@ -463,6 +464,40 @@ int packet_stream_read_packet(PacketStream *packet_stream, int8_t *buffer) {
         return 0;
     }
 
+    if (packet_stream->retro) {
+        /* a two byte length, then the opcode and data in order */
+        if (packet_stream->length == 0 &&
+            packet_stream_available_bytes(packet_stream, 2)) {
+            int high = packet_stream_read_byte(packet_stream);
+            packet_stream->length =
+                high * 256 + packet_stream_read_byte(packet_stream);
+
+            if (packet_stream->length > PACKET_BUFFER_LENGTH) {
+                packet_stream->socket_exception = 1;
+                packet_stream->socket_exception_message = "packet too long";
+                packet_stream->length = 0;
+                return 0;
+            }
+        }
+
+        if (packet_stream->length > 0 &&
+            packet_stream_available_bytes(packet_stream,
+                                          packet_stream->length)) {
+            if (packet_stream_read_bytes(packet_stream, packet_stream->length,
+                                         buffer) < 0) {
+                return 0;
+            }
+
+            int i = packet_stream->length;
+            packet_stream->length = 0;
+            packet_stream->read_tries = 0;
+
+            return i;
+        }
+
+        return 0;
+    }
+
     if (packet_stream->length == 0 &&
         packet_stream_available_bytes(packet_stream, 2)) {
         packet_stream->length = packet_stream_read_byte(packet_stream);
@@ -596,9 +631,34 @@ void packet_stream_send_packet(PacketStream *packet_stream) {
         0xffff;
 #endif
 
+    if (packet_stream->retro) {
+        /* the packet was built in its 204 form: rewrite it as the 2001 one */
+        int8_t *packet = packet_stream->packet_data + packet_stream->packet_start + 2;
+        int room = PACKET_BUFFER_LENGTH - packet_stream->packet_start - 2;
+        int8_t translated[PACKET_BUFFER_LENGTH];
+
+        int translated_length = retro_translate_client_packet(
+            packet, packet_stream->packet_end - packet_stream->packet_start - 2,
+            translated, room < PACKET_BUFFER_LENGTH ? room : PACKET_BUFFER_LENGTH);
+
+        if (translated_length <= 0) {
+            packet_stream->packet_end = packet_stream->packet_start + 3;
+            return;
+        }
+
+        memcpy(packet, translated, translated_length);
+        packet_stream->packet_end =
+            packet_stream->packet_start + 2 + translated_length;
+    }
+
     int length = packet_stream->packet_end - packet_stream->packet_start - 2;
 
-    if (length >= 160) {
+    if (packet_stream->retro) {
+        packet_stream->packet_data[packet_stream->packet_start] =
+            (length >> 8) & 0xff;
+        packet_stream->packet_data[packet_stream->packet_start + 1] =
+            length & 0xff;
+    } else if (length >= 160) {
         packet_stream->packet_data[packet_stream->packet_start] =
             (160 + (length / 256)) & 0xff;
 
@@ -668,17 +728,25 @@ static void packet_stream_put_rsa(PacketStream *packet_stream,
         return;
     }
 
-    packet_stream_put_byte(packet_stream, sizeof(result));
+    /* the result as 64 bytes, zeros first */
+    uint8_t block[sizeof(result)] = {0};
+    memcpy(block + sizeof(block) - res_len, result, res_len);
 
-    /* in java's BigInteger byte array array, zeros at the beginning are
-     * ignored unless they're being used to indicate the MSB for sign. since
-     * the byte array lengths range from 63-65 and we always want a positive
-     * integer, we can make result_length 65 and begin with up to two 0 bytes */
-    for (size_t i = 0; i < (sizeof(result) - res_len); ++i) {
+    /* the server reads it as a java BigInteger, which takes a set top bit
+     * as negative: then it needs a zero byte in front, as BigInteger's
+     * toByteArray gives the java client. without one, about one login in
+     * twenty on game.openrsc.com's key decrypted wrong (an invalid password
+     * or a dropped connection) */
+    int needs_sign = (block[0] & 0x80) != 0;
+
+    packet_stream_put_byte(packet_stream, sizeof(block) + needs_sign);
+
+    if (needs_sign) {
         packet_stream_put_byte(packet_stream, 0);
     }
-    for (int i = 0; i < res_len; ++i) {
-        packet_stream_put_byte(packet_stream, result[i]);
+
+    for (size_t i = 0; i < sizeof(block); ++i) {
+        packet_stream_put_byte(packet_stream, block[i]);
     }
 }
 #endif

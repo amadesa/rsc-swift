@@ -529,6 +529,10 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
         y += OPTIONS_LINE_BREAK - 3;
     }
 
+    /* the tap checks below use where these were drawn; the layout above
+     * differed between the two, so taps landed a line low on touch */
+    int privacy_y = y;
+
     sprintf(settings_string, "Block chat messages: %s",
             (!mud->settings_block_chat ? "@red@<off>" : "@gre@<on>"));
 
@@ -553,7 +557,8 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
 
     y += OPTIONS_LINE_BREAK;
 
-    if (mud->options->members) {
+    /* the 2001 game has no duels */
+    if (mud->options->members && !mudclient_is_retro(mud)) {
         sprintf(settings_string, "Block duel requests: %s",
                 (!mud->settings_block_duel ? "@red@<off>" : "@gre@<on>"));
 
@@ -729,6 +734,8 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
             y += OPTIONS_LINE_BREAK - 4;
         }
 
+        y = privacy_y;
+
         if (mud->mouse_x > x && mud->mouse_x < x + panel_width &&
             mud->mouse_y > y - 12 && mud->mouse_y < y + 4 &&
             mud->mouse_button_click == 1) {
@@ -756,7 +763,8 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
 
         y += OPTIONS_LINE_BREAK;
 
-        if (mud->options->members && mud->mouse_x > x &&
+        if (mud->options->members && !mudclient_is_retro(mud) &&
+            mud->mouse_x > x &&
             mud->mouse_x < x + panel_width && mud->mouse_y > y - 12 &&
             mud->mouse_y < y + 4 && mud->mouse_button_click == 1) {
             mud->settings_block_duel = 1 - mud->settings_block_duel;

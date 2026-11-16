@@ -71,6 +71,9 @@ struct PacketStream {
     int closed;
     int delay;
     int length;
+
+    /* the May 2001 protocol (2001Scape): two byte lengths and no ISAAC */
+    int retro;
     int max_read_tries;
     int8_t packet_data[PACKET_BUFFER_LENGTH];
     int packet_end;
