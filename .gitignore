@@ -9,3 +9,6 @@ build/
 
 # personal signing settings (see Config/Signing.local.xcconfig.example)
 Config/Signing.local.xcconfig
+
+# relay build output
+relay/rsc-relay*
