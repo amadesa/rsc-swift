@@ -7,7 +7,9 @@ Swift/Metal platform layer and a touch-first UI. It defaults to the
 
 Runs on iOS/iPadOS 12.2 and later. A separate legacy build runs on 32-bit
 devices stuck on iOS 10, such as the iPad 4 and iPhone 5 (see
-[Legacy build](#legacy-build-ios-10-32-bit)).
+[Legacy build](#legacy-build-ios-10-32-bit)). An Apple Watch app (watchOS 7
+and later) plays the same game on the wrist, through
+[rsc-relay](relay/README.md) (see [Apple Watch](#apple-watch)).
 
 ## Features
 
@@ -20,13 +22,24 @@ devices stuck on iOS 10, such as the iPad 4 and iPhone 5 (see
 - Native keyboard for chat and text boxes: hold-to-delete, paste, and a bar
   above the keyboard showing what you're typing. Hardware keyboards work
   too (arrows rotate the camera).
-- Login screen with stacked **Login**, **Register**, **Worlds** and
-  **Options** buttons. Register opens the selected world's sign-up page in
-  Safari.
+- Login screen with **Login**, **Register**, **Worlds**, **Options** and
+  **Accounts** buttons, stacked, or in a grid where they don't fit (iPad).
+  Register opens the selected world's sign-up page in Safari.
+- **Accounts:** logins the server accepted are saved in the keychain, to
+  log in again with a tap. Each can be shared with the Apple Watch or kept
+  off it.
 - World list with **Add world** (import an rscplus world `.ini` from Files
   or a URL, or enter a host and port by hand) and **Remove**.
 - Camera defaults to manual on touch screens until you pick a mode in game.
 - Combat style is remembered per character and world.
+- Hits, prayer and fatigue bars along the bottom of the screen.
+- **Alerts:** a vibration or notification for low hits, fatigue, standing in
+  the same spot, being about to be logged out, death, a full inventory,
+  level ups and messages. Each can be turned on or off in Settings > RSC >
+  Alerts.
+- **Stay connected in the background** (on by default, also under
+  Additional options > Game): the game keeps its connection while you use
+  another app.
 
 ## Building
 
@@ -37,7 +50,9 @@ Requires Xcode 16 or later.
    `Config/Signing.local.xcconfig` and fill in your Apple developer team ID
    and a bundle identifier prefix. That file is ignored by git, so your
    signing details stay out of the repo. The simulator needs no signing.
-3. Run the `rsc-swift` scheme.
+3. Run the `rsc-swift` scheme. It includes the Apple Watch app, which the
+   `rsc-watch` scheme builds on its own (for example for the watch
+   simulator).
 
 From the command line:
 
@@ -73,6 +88,48 @@ Interface Builder tools don't run on current macOS. On devices without
 Metal the app shows frames with Core Graphics (`FrameDisplay.swift`). The
 Swift code is kept compatible with Swift 5.6 and iOS 10.
 
+## Apple Watch
+
+The watch app runs the same rsc-c client as the iPhone, full screen, with
+its own controls:
+
+- **Tap** to walk and click, **hold** for the right-click menu (shown as a
+  list), and **drag** to rotate the camera.
+- **Turn the Digital Crown** to bring out the inventory, map, stats, magic,
+  friends and options icons. An open tab covers the screen, with a header to
+  go to the previous or next tab or close it; the crown also steps through
+  the tabs.
+- Hits, prayer and fatigue in the bottom left, and the combat style in the
+  bottom right (tap to change it).
+- Saved accounts as large buttons that log in with a tap, since there's no
+  way to type a password on the game's login screen.
+- The same alerts as the iPhone, as taps on the wrist.
+- It keeps running with the wrist down for up to an hour at a time.
+
+How the tabs open can be changed in game, under Options on the watch or
+Additional options > Game on the iPhone: **Tab panels** full screen, beside
+the icons, or off (placed as on the iPhone), and the **keyboard button** on
+or off.
+
+### Setting it up
+
+watchOS doesn't let apps open the game's TCP connection, so the watch plays
+through [rsc-relay](relay/README.md), a small program that runs on a
+computer at home (or a server) and passes the game's traffic on over HTTPS.
+
+1. Run `rsc-relay` and `rsc-relay pair` on that computer (see
+   [relay/README.md](relay/README.md)).
+2. On the iPhone, open **Accounts > Relay**, tap the relay and type the
+   pairing code.
+3. Log in on the iPhone, which saves the account.
+4. Open RSC on the watch with the iPhone nearby. It receives the iPhone's
+   relay, accounts, worlds, options and alert settings; tap an account to
+   play.
+
+Away from home the watch reaches the relay over any address it lists
+(home network, public IP, Tailscale or a Tailscale Funnel URL), and as a
+last resort through the iPhone.
+
 ## Project layout
 
 ```
@@ -82,6 +139,7 @@ rsc-swift/
     mudclient-ios.c           iOS platform layer: input queue, touch gestures,
                               frame handoff, sound/keyboard/URL/world callbacks
     rsc-bridge.h              C API used from Swift
+    relay-transport.c         lets packet-stream.c use the relay like a socket
   Resources/cache/            game data (.jag/.mem) from rsc-c
   AppDelegate.swift           UIKit app entry point (makes the window before iOS 13)
   SceneDelegate.swift         makes the window on iOS 13+ (scene life cycle)
@@ -92,10 +150,29 @@ rsc-swift/
   FrameRenderer.swift         uploads frames to a Metal texture
   FrameShaders.metal
   GameAudio.swift             8kHz sound effects via AVAudioEngine
+  RelayTransport.swift        game connection over HTTPS through rsc-relay
+  Settings.bundle             Settings app page for the relay
   AddWorldController.swift    "Add world" sheet
   WorldConfig.swift           world .ini parsing
+  AccountStore.swift          saved logins, in the keychain
+  AccountsController.swift    "Accounts" screen
+  GameStatus.swift            hits, prayer etc. from the game, for alerts and the watch
+  GameAlert(s).swift          alerts: haptics in the app, notifications in the background
+  PhoneWatchSync.swift        sends the watch its settings and accounts
+  RelayController.swift       Accounts > Relay: pairing with rsc-relay
+  RelayPairing.swift          the pairing request
+  RelayRoute.swift            picks the relay address that answers first
+  RelayCheck.swift            explains why a relay connection failed
+Watch/
+  RSCWatchApp.swift           Apple Watch app entry point
+  WatchGame.swift             runs the client on the watch, through the relay
+  GameScreenView.swift        the game, stats overlay, crown and touches
+  AccountScreen.swift         the watch's login screen
+  WatchSync.swift             receives what the iPhone sends
+  KeepAlive.swift             keeps the game running with the wrist down
 scripts/rsc-c-ios.patch       every change made to the upstream rsc-c files
 scripts/build-legacy.sh       32-bit iOS 10 build using Xcode 13's tools
+relay/                        HTTPS-to-TCP relay so Apple Watch can connect (see relay/README.md)
 ```
 
 ## How it works
@@ -110,6 +187,14 @@ scripts/build-legacy.sh       32-bit iOS 10 build using Xcode 13's tools
   the screen size; the login backdrop is pre-rendered while loading.
 - Phones render at about one game pixel per point; iPads scale so the short
   side is about 400 game pixels.
+- The Apple Watch app connects through [rsc-relay](relay/README.md) over
+  HTTPS, since watchOS doesn't allow apps to open raw TCP connections; the
+  iPhone can use it too (Settings > RSC > Relay). `relay-transport.c` makes
+  the relay look like a non-blocking socket to the game, and
+  `RelayTransport.swift` makes the HTTPS requests. The apps pin the relay's
+  key, so every address it's reached at is equally safe.
+- The watch builds the same C core with the screen size of the watch, and
+  its UI changes are behind `mudclient_ios_is_watch_ui()`.
 - Options and worlds are stored in Application Support as `options.ini` and
   `worlds.cfg`, in the desktop rsc-c format. `worlds.cfg` lines are
   `name host port rsa_exp rsa_mod [register_url|-]`.
