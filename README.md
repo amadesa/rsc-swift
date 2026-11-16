@@ -197,7 +197,14 @@ relay/                        HTTPS-to-TCP relay so Apple Watch can connect (see
   its UI changes are behind `mudclient_ios_is_watch_ui()`.
 - Options and worlds are stored in Application Support as `options.ini` and
   `worlds.cfg`, in the desktop rsc-c format. `worlds.cfg` lines are
-  `name host port rsa_exp rsa_mod [register_url|-]`.
+  `name host port rsa_exp rsa_mod [register_url|-] [2001]`, the last for a
+  world on the May 2001 game (2001Scape).
+- 2001Scape's worlds run the May 2001 game (protocol 38), from the same C
+  core: `retro-data.c` reads its data, `retro-packets.c` its packets, and
+  `game-switch.c` swaps the game data when the selected world's game
+  changes. The 2001 data isn't shipped; `RetroData.swift` fetches it from
+  rsc.vet's 2001 web client (about 600 KB) the first time, into Application
+  Support/2001, checking each file's SHA-256.
 - The app target compiles the C code with `IOS`, `RENDER_SW`, `-fwrapv` and
   gnu99. Define `REVISION_177` to use the 177 protocol instead of 203; OpenRSC
   accepts both.

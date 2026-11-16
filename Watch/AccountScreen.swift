@@ -17,19 +17,17 @@ struct AccountScreen: View {
                 .listRowBackground(Color.clear)
 
             if let name = game.loggingInAs {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .frame(width: 24, height: 24)
-                    Text("Logging in as \(name)…")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-                .listRowBackground(Color.clear)
+                progressRow("Logging in as \(name)…",
+                            detail: game.login.isDownloadingRetroData
+                                ? "Downloading the 2001 game first, about 600 KB"
+                                : nil)
             } else if let error = game.loginError {
-                Text(error)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(RSC.yellow)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .listRowBackground(Color.clear)
+                errorRow(error)
+            } else if game.login.isDownloadingRetroData {
+                // the world was chosen in Worlds
+                progressRow("Downloading the 2001 game…", detail: "About 600 KB, just this once")
+            } else if game.login.didRetroDownloadFail {
+                errorRow("Couldn't download the 2001 game. Check the connection, then tap an account to try again.")
             }
 
             if game.accounts.isEmpty {
@@ -111,6 +109,32 @@ struct AccountScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func progressRow(_ title: String, detail: String?) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                if let detail = detail {
+                    Text(detail)
+                        .font(.system(size: 13))
+                        .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .listRowBackground(Color.clear)
+    }
+
+    private func errorRow(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundColor(RSC.yellow)
+            .fixedSize(horizontal: false, vertical: true)
+            .listRowBackground(Color.clear)
     }
 
     private func sectionTitle(_ title: String) -> some View {

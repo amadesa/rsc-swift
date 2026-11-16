@@ -160,10 +160,12 @@ struct GameScreenView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         statLine("Hits", "\(status.hits)/\(status.maxHits)",
                                  hitsColour(status))
-                        statLine("Prayer", "\(status.prayer)/\(status.maxPrayer)",
-                                 Color(red: 0.4, green: 0.85, blue: 1))
-                        statLine("Fatigue", "\(status.fatigue * 100 / 750)%",
-                                 status.fatigue >= 600 ? .orange : .white)
+                        if !status.isRetro {
+                            statLine("Prayer", "\(status.prayer)/\(status.maxPrayer)",
+                                     Color(red: 0.4, green: 0.85, blue: 1))
+                            statLine("Fatigue", "\(status.fatigue * 100 / 750)%",
+                                     status.fatigue >= 600 ? .orange : .white)
+                        }
                     }
                     .allowsHitTesting(false)
                     .padding(.leading, stats.leading)
@@ -326,10 +328,12 @@ struct GameScreenView: View {
 
             if status.isLoggedIn {
                 bigStat("Hits", "\(status.hits)/\(status.maxHits)", hitsColour(status))
-                bigStat("Prayer", "\(status.prayer)/\(status.maxPrayer)",
-                        Color(red: 0.4, green: 0.85, blue: 1))
-                bigStat("Fatigue", "\(status.fatigue * 100 / 750)%",
-                        status.fatigue >= 600 ? .orange : .white)
+                if !status.isRetro {
+                    bigStat("Prayer", "\(status.prayer)/\(status.maxPrayer)",
+                            Color(red: 0.4, green: 0.85, blue: 1))
+                    bigStat("Fatigue", "\(status.fatigue * 100 / 750)%",
+                            status.fatigue >= 600 ? .orange : .white)
+                }
                 Text("Combat: \(Self.combatStyles[min(max(status.combatStyle, 0), 3)])")
                     .font(.footnote)
             } else {

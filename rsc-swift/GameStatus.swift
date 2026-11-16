@@ -19,6 +19,8 @@ struct GameStatus: Equatable {
     var idleLogoutSeconds = -1
     /// the account logged in to
     var username = ""
+    /// playing the May 2001 game, which has no prayer points or fatigue
+    var isRetro = false
 
     static func current() -> GameStatus {
         var status = RscStatus()
@@ -35,7 +37,8 @@ struct GameStatus: Equatable {
             fatigue: Int(status.fatigue), combatStyle: Int(status.combat_style),
             isTabOpen: status.ui_tab != 0, isWindowOpen: status.window_open != 0,
             inventoryCount: Int(status.inventory_count), isDead: status.dead != 0,
-            idleLogoutSeconds: Int(status.idle_logout_seconds), username: username)
+            idleLogoutSeconds: Int(status.idle_logout_seconds), username: username,
+            isRetro: status.retro != 0)
     }
 }
 
@@ -89,6 +92,7 @@ extension GameStatus {
             "logged_in": isLoggedIn, "hits": hits, "max_hits": maxHits,
             "prayer": prayer, "max_prayer": maxPrayer, "fatigue": fatigue,
             "combat_style": combatStyle, "username": username,
+            "retro": isRetro,
         ]
     }
 
@@ -102,5 +106,6 @@ extension GameStatus {
         fatigue = dictionary["fatigue"] as? Int ?? 0
         combatStyle = dictionary["combat_style"] as? Int ?? 0
         username = dictionary["username"] as? String ?? ""
+        isRetro = dictionary["retro"] as? Bool ?? false
     }
 }

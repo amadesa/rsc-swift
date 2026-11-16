@@ -108,8 +108,7 @@ final class AddWorldController: NSObject {
             }
         }
 
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Add", style: .default) { [self] _ in
+        func addWorld(isRetro: Bool) {
             let values = (alert.textFields ?? []).map {
                 $0.text?.trimmingCharacters(in: .whitespaces) ?? ""
             }
@@ -118,8 +117,18 @@ final class AddWorldController: NSObject {
             if !values[0].isEmpty { ini += "name=\(values[0])\n" }
             if !values[3].isEmpty { ini += "rsa_pub_key=\(values[3])\n" }
             if !values[4].isEmpty { ini += "register_url=\(values[4])\n" }
+            if isRetro { ini += "game=2001\n" }
 
             add(ini: ini)
+        }
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Add", style: .default) { _ in
+            addWorld(isRetro: false)
+        })
+        // a world on the May 2001 game, like 2001Scape
+        alert.addAction(UIAlertAction(title: "Add as 2001 game", style: .default) { _ in
+            addWorld(isRetro: true)
         })
 
         presenter?.present(alert, animated: true)

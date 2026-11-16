@@ -173,6 +173,18 @@ final class GameClient {
             }
         }
 
+        // a 2001Scape world needs the 2001 game's data, fetched once
+        config.on_request_retro_data = { _, dataDirectory in
+            guard let dataDirectory = dataDirectory else { return }
+            let directory = URL(fileURLWithPath: String(cString: dataDirectory))
+
+            DispatchQueue.main.async {
+                RetroData.download(into: directory) { success in
+                    rsc_retro_data_ready(success ? 1 : 0)
+                }
+            }
+        }
+
         GameAlerts.shared.start()
         GameAlerts.shared.forward = { alert, title, body, isUrgent in
             PhoneWatchSync.shared.send(alert: alert, title: title, body: body, isUrgent: isUrgent)
@@ -188,9 +200,12 @@ final class GameClient {
         // rsc_start copies the path strings before returning
         cacheDirectory.path.withCString { cachePath in
             configDirectory.path.withCString { configPath in
-                config.cache_dir = cachePath
-                config.config_dir = configPath
-                rsc_start(&config)
+                RetroData.directory.path.withCString { dataPath in
+                    config.cache_dir = cachePath
+                    config.config_dir = configPath
+                    config.data_dir = dataPath
+                    rsc_start(&config)
+                }
             }
         }
 
@@ -264,7 +279,7 @@ final class GameClient {
                         (world.registerURL ?? "").withCString { registerURL in
                             rsc_add_world(
                                 name, host, Int32(world.port), exponent, modulus,
-                                registerURL)
+                                registerURL, world.isRetro ? 1 : 0)
                         }
                     }
                 }

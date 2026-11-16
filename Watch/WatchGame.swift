@@ -77,6 +77,13 @@ final class WatchGame: ObservableObject {
         /// where the RuneScape logo is in the frame
         var logoY = 0
         var logoHeight = 0
+        /// the 2001 game's data, for a 2001Scape world: 0 here or not
+        /// needed, 1 downloading, 2 the download failed
+        var retroData = 0
+
+        var isDownloadingRetroData: Bool { retroData == 1 }
+        /// until another world is chosen (which clears the status)
+        var didRetroDownloadFail: Bool { retroData == 2 && !status.isEmpty }
 
         /// on the welcome or login screen, which the watch shows itself
         var isAccountScreen: Bool { isReady && !isOptionsOpen && (screen == 0 || screen == 2) }
@@ -102,7 +109,7 @@ final class WatchGame: ObservableObject {
                 loginsFinished: Int(state.logins_finished), status: status,
                 worldName: text(state.world_name), worldHost: text(state.world_host),
                 worldPort: Int(state.world_port), logoY: Int(state.logo_y),
-                logoHeight: Int(state.logo_height))
+                logoHeight: Int(state.logo_height), retroData: Int(state.retro_data))
         }
     }
 
@@ -354,7 +361,8 @@ final class WatchGame: ObservableObject {
     /// RSC_TEST_PASSWORD, RSC_TEST_HOST and RSC_TEST_PORT in the environment
     /// (`SIMCTL_CHILD_` ones from `simctl launch`), logs in once the game has
     /// loaded, taps at RSC_TEST_TAPS, then opens the ui tab numbered
-    /// RSC_TEST_TAB, if given.
+    /// RSC_TEST_TAB, if given. RSC_TEST_REVEAL_TABS=1 brings out the tab
+    /// icons, as turning the crown does.
     private func startSimulatorTest() {
         let environment = ProcessInfo.processInfo.environment
 
@@ -405,6 +413,12 @@ final class WatchGame: ObservableObject {
         let tabTaps = Self.testTaps(environment["RSC_TEST_TAB_TAPS"])
 
         Self.tap(taps, after: 8)
+
+        if environment["RSC_TEST_REVEAL_TABS"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                self.setTabsRevealed(true)
+            }
+        }
 
         if let tab = tab {
             let tabTime = 9 + Double(taps.count)
@@ -549,6 +563,18 @@ final class WatchGame: ObservableObject {
             }
         }
 
+        // a 2001Scape world needs the 2001 game's data, fetched once
+        config.on_request_retro_data = { _, dataDirectory in
+            guard let dataDirectory = dataDirectory else { return }
+            let directory = URL(fileURLWithPath: String(cString: dataDirectory))
+
+            DispatchQueue.main.async {
+                RetroData.download(into: directory) { success in
+                    rsc_retro_data_ready(success ? 1 : 0)
+                }
+            }
+        }
+
         rsc_set_watch_ui(1)
         GameAlerts.shared.start()
 
@@ -557,9 +583,12 @@ final class WatchGame: ObservableObject {
 
         cacheDirectory.path.withCString { cachePath in
             WatchSync.shared.configDirectory.path.withCString { configPath in
-                config.cache_dir = cachePath
-                config.config_dir = configPath
-                rsc_start(&config)
+                RetroData.directory.path.withCString { dataPath in
+                    config.cache_dir = cachePath
+                    config.config_dir = configPath
+                    config.data_dir = dataPath
+                    rsc_start(&config)
+                }
             }
         }
 

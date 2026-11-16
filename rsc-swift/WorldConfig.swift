@@ -27,15 +27,19 @@ struct WorldConfig {
     /// Account creation page opened by "Register". When nil the client
     /// falls back to its built-in links for known servers.
     var registerURL: String?
+    /// Runs the May 2001 game, like 2001Scape, whose data the app fetches
+    /// the first time. game.openrsc.com:43593 is known to anyway.
+    var isRetro: Bool
 
     init(name: String, host: String, port: Int, rsaExponent: String, rsaModulus: String,
-         registerURL: String? = nil) {
+         registerURL: String? = nil, isRetro: Bool = false) {
         self.name = name
         self.host = host
         self.port = port
         self.rsaExponent = rsaExponent
         self.rsaModulus = rsaModulus
         self.registerURL = registerURL
+        self.isRetro = isRetro
     }
 
     /// Parses an rscplus world file, e.g. https://rsc.vet/worlds/01_Preservation.ini
@@ -46,7 +50,8 @@ struct WorldConfig {
     ///     rsa_pub_key=7112866275...
     ///     rsa_exponent=65537
     ///
-    /// rsc-swift also reads an optional `register_url=` line.
+    /// rsc-swift also reads an optional `register_url=` line, and `game=2001`
+    /// for a world on the May 2001 game.
     init(ini: String) throws {
         var values: [String: String] = [:]
 
@@ -101,7 +106,7 @@ struct WorldConfig {
             name: values["name"].flatMap { $0.isEmpty ? nil : $0 } ?? host,
             host: Self.stripScheme(host), port: port,
             rsaExponent: exponent, rsaModulus: modulus,
-            registerURL: registerURL)
+            registerURL: registerURL, isRetro: values["game"] == "2001")
     }
 
     /// Accepts "game.example.com" or "https://game.example.com/".
