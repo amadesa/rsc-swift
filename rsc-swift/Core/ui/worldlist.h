@@ -11,5 +11,20 @@ void worldlist_add(mudclient *mud, const char *name, const char *host,
 void worldlist_remove(mudclient *mud, int index);
 #ifdef IOS
 void worldlist_register(mudclient *mud);
+
+/* select the world at this address, returning 0 if the list has none */
+int worldlist_select_address(mudclient *mud, const char *host, int port);
+
+/* the name of the world at this address, or "" */
+const char *worldlist_name_at(const char *host, int port);
+
+/* on the iPhone the list is drawn by worldlist_draw_scrolling and scrolled
+ * and tapped through a native scroll view over it (GameViewController) */
+int worldlist_scrolls_natively(void);
+void worldlist_draw_scrolling(mudclient *mud);
+int worldlist_row_height(void);
+int worldlist_get_count(void);
+/* select the world at this index, as tapping it would */
+void worldlist_choose(mudclient *mud, int index);
 #endif
 #endif

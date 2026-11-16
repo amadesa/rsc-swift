@@ -6,6 +6,7 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
     int columns = mud->surface->height < 260 ? 6 : 5;
     int rows = (INVENTORY_ITEMS_MAX / columns);
 
+    int slot_width = ITEM_GRID_SLOT_WIDTH;
     int slot_height = ITEM_GRID_SLOT_HEIGHT - is_touch;
 
     int width = (ITEM_GRID_SLOT_WIDTH * columns);
@@ -16,12 +17,31 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
 
     if (is_touch) {
         if (mud->show_dialog_bank) {
-            ui_x = mud->surface->width - width - 5;
+            ui_x = mud->surface->width - MUD_SAFE_RIGHT - width - 5;
         } else {
             ui_x = UI_TABS_TOUCH_X - width - 1;
         }
 
         ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
+    }
+
+    /* on the watch, bigger slots filling the space */
+    if (mudclient_ui_tab_is_watch_area(mud) && !mud->show_dialog_bank) {
+        int area_width = 0;
+        int area_height = 0;
+
+        mudclient_ui_tab_watch_area(mud, &ui_x, &ui_y, &area_width,
+                                    &area_height);
+
+        columns = 5;
+        rows = INVENTORY_ITEMS_MAX / columns;
+        slot_width = area_width / columns;
+        slot_height = area_height / rows;
+        width = slot_width * columns;
+        height = slot_height * rows;
+
+        /* against the icons */
+        ui_x += area_width - width;
     }
 
     if (mud->options->version_media >= 59) {
@@ -42,7 +62,7 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
 
     /* item slots */
     for (int i = 0; i < INVENTORY_ITEMS_MAX; i++) {
-        int slot_x = ui_x + (i % columns) * ITEM_GRID_SLOT_WIDTH;
+        int slot_x = ui_x + (i % columns) * slot_width;
         int slot_y = ui_y + (i / columns) * slot_height;
         int slot_colour = GREY_B5;
 
@@ -50,15 +70,18 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
             slot_colour = RED;
         }
 
-        surface_draw_box_alpha(mud->surface, slot_x, slot_y,
-                               ITEM_GRID_SLOT_WIDTH, slot_height, slot_colour,
-                               128);
+        surface_draw_box_alpha(mud->surface, slot_x, slot_y, slot_width,
+                               slot_height, slot_colour, 128);
 
         if (i < mud->inventory_items_count) {
             int item_id = mud->inventory_item_id[i];
 
-            mudclient_draw_item(mud, slot_x, slot_y, ITEM_GRID_SLOT_WIDTH,
-                                ITEM_GRID_SLOT_HEIGHT, item_id);
+            /* items keep their usual size, in the middle of a bigger
+             * slot */
+            mudclient_draw_item(
+                mud, slot_x + (slot_width - ITEM_GRID_SLOT_WIDTH) / 2,
+                slot_y + (slot_height - ITEM_GRID_SLOT_HEIGHT + is_touch) / 2,
+                ITEM_GRID_SLOT_WIDTH, ITEM_GRID_SLOT_HEIGHT, item_id);
 
             char formatted_amount[12] = {0};
 
@@ -75,7 +98,7 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
     /* row and column lines */
     for (int i = 1; i <= columns - 1; i++) {
         surface_draw_line_vertical(
-            mud->surface, ui_x + i * ITEM_GRID_SLOT_WIDTH, ui_y, height, BLACK);
+            mud->surface, ui_x + i * slot_width, ui_y, height, BLACK);
     }
 
     for (int i = 1; i <= rows - 1; i++) {
@@ -95,7 +118,7 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
     }
 
     int item_index =
-        (mouse_x / ITEM_GRID_SLOT_WIDTH) + (mouse_y / slot_height) * columns;
+        (mouse_x / slot_width) + (mouse_y / slot_height) * columns;
 
     if (item_index >= mud->inventory_items_count) {
         return;

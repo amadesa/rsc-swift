@@ -1,5 +1,9 @@
 #include "mudclient.h"
 
+#ifdef IOS
+#include "relay-transport.h"
+#endif
+
 #ifdef EMSCRIPTEN
 /* clang doesn't know what triple equals is, understandably */
 /* clang-format off */
@@ -300,31 +304,42 @@ void mudclient_resize(mudclient *mud) {
             mud->panel_appearance->offset_y = dynamic_offset_y;
         }
 
-        if (mud->panel_message_tabs != NULL && !is_touch) {
-            mud->panel_message_tabs->offset_y = full_offset_y;
+        if (mud->panel_message_tabs != NULL) {
+            if (is_touch) {
+                /* the chat tabs are along the top */
+                mud->panel_message_tabs->offset_x = MUD_SAFE_LEFT;
+                mud->panel_message_tabs->offset_y = MUD_SAFE_TOP;
+            } else {
+                mud->panel_message_tabs->offset_y = full_offset_y;
+            }
         }
 
+        /* the touch tab lists follow the ui tab icons in the bottom right
+         * (created with no safe insets) */
+        int tabs_offset_x = full_offset_x - (is_touch ? MUD_SAFE_RIGHT : 0);
+        int tabs_offset_y = full_offset_y - MUD_SAFE_BOTTOM;
+
         if (mud->panel_quests != NULL) {
-            mud->panel_quests->offset_x = full_offset_x;
+            mud->panel_quests->offset_x = tabs_offset_x;
 
             if (is_touch) {
-                mud->panel_quests->offset_y = full_offset_y;
+                mud->panel_quests->offset_y = tabs_offset_y;
             }
         }
 
         if (mud->panel_magic != NULL) {
-            mud->panel_magic->offset_x = full_offset_x;
+            mud->panel_magic->offset_x = tabs_offset_x;
 
             if (is_touch) {
-                mud->panel_magic->offset_y = full_offset_y;
+                mud->panel_magic->offset_y = tabs_offset_y;
             }
         }
 
         if (mud->panel_social_list != NULL) {
-            mud->panel_social_list->offset_x = full_offset_x;
+            mud->panel_social_list->offset_x = tabs_offset_x;
 
             if (is_touch) {
-                mud->panel_social_list->offset_y = full_offset_y;
+                mud->panel_social_list->offset_y = tabs_offset_y;
             }
         }
 
@@ -2214,6 +2229,16 @@ void mudclient_login(mudclient *mud, char *username, char *password,
         strcpy(mud->options->password,
                mud->options->remember_password ? password : "");
 
+#ifdef IOS
+        mudclient_ios_on_login(mud, username, password);
+
+        /* options.ini never gets it (options_save); the watch doesn't keep
+         * it in memory either, as it logs in from its account list */
+        if (mudclient_ios_is_watch_ui()) {
+            mud->options->password[0] = '\0';
+        }
+#endif
+
         if (mud->options->remember_username ||
             mud->options->remember_password) {
             options_save(mud->options);
@@ -2348,6 +2373,18 @@ login_fail:
         mudclient_reset_login_screen(mud);
         mud->login_screen = LOGIN_STAGE_EXISTING;
     }
+
+#ifdef IOS
+    /* through the relay there's more to go wrong, and the app knows what */
+    char relay_title[96];
+    char relay_advice[96];
+
+    if (relay_transport_failure(relay_title, relay_advice,
+                                sizeof(relay_title))) {
+        mudclient_show_login_screen_status(mud, relay_title, relay_advice);
+        return;
+    }
+#endif
 
     mudclient_show_login_screen_status(
         mud, "Sorry! Unable to connect.",
@@ -2667,6 +2704,10 @@ void mudclient_start_game(mudclient *mud) {
 
 #ifdef RENDER_3DS_GL
     scene_set_bounds(mud->scene, mud->game_width, mud->game_height);
+#elif defined(IOS)
+    /* the watch has no blue bar along the bottom (see mudclient_on_resize) */
+    scene_set_bounds(mud->scene, mud->game_width,
+                     mud->game_height - (mudclient_ios_is_watch_ui() ? 0 : 12));
 #else
     scene_set_bounds(mud->scene, mud->game_width, mud->game_height - 12);
 #endif
@@ -3257,10 +3298,10 @@ void mudclient_handle_camera_zoom(mudclient *mud) {
 
     int is_touch = mudclient_is_touch(mud);
 
-    int exclude_max_x = MUD_VANILLA_WIDTH;
+    int exclude_max_x = MUD_VANILLA_WIDTH + (is_touch ? MUD_SAFE_LEFT : 0);
 
-    int exclude_min_y = is_touch ? 0 : mud->surface->height - 80;
-    int exclude_max_y = is_touch ? 100 : mud->surface->height;
+    int exclude_min_y = is_touch ? MUD_SAFE_TOP : mud->surface->height - 80;
+    int exclude_max_y = is_touch ? 100 + MUD_SAFE_TOP : mud->surface->height;
 
     if (mud->mouse_scroll_delta != 0 &&
         (mud->show_ui_tab == 0 || mud->show_ui_tab == MAP_TAB) &&
@@ -4239,6 +4280,8 @@ GameCharacter *mudclient_get_opponent(mudclient *mud) {
 }
 
 void mudclient_draw_ui(mudclient *mud) {
+    mud->dialog_bottom = 0;
+
     mudclient_draw_ui_tabs(mud);
 
     int no_menus = !mud->show_option_menu && !mud->show_right_click_menu;
@@ -4318,7 +4361,7 @@ void mudclient_draw_ui(mudclient *mud) {
 
         mudclient_set_active_ui_tab(mud, no_menus);
 
-        if (mudclient_is_in_combat(mud) || mud->options->combat_style_always) {
+        if (mudclient_is_combat_style_shown(mud)) {
             mudclient_draw_combat_style(mud);
         }
 
@@ -4868,9 +4911,11 @@ void mudclient_draw_game(mudclient *mud) {
         sprintf(fps, "Fps: %d", mud->fps);
 
         surface_draw_string(mud->surface, fps,
-                            is_touch ? 9 + offset_x
+                            is_touch ? 9 + offset_x + MUD_SAFE_LEFT
                                      : mud->surface->width - 62 - offset_x,
-                            mud->surface->height - 22, FONT_BOLD_12, YELLOW);
+                            mud->surface->height - 22 -
+                                mudclient_bottom_bar_inset(mud),
+                            FONT_BOLD_12, YELLOW);
     }
 
 #ifndef REVISION_177
@@ -4896,14 +4941,15 @@ void mudclient_draw_game(mudclient *mud) {
         mud->is_in_wilderness = wilderness_depth > 0;
 
         if (mud->is_in_wilderness) {
-            int x = is_touch ? 29 : mud->surface->width - 59;
+            int x = is_touch ? 29 + MUD_SAFE_LEFT : mud->surface->width - 59;
+            int bottom =
+                mud->surface->height - mudclient_bottom_bar_inset(mud);
 
-            surface_draw_sprite(mud->surface, x, mud->surface->height - 68,
+            surface_draw_sprite(mud->surface, x, bottom - 68,
                                 mud->sprite_media + 13);
 
             surface_draw_string_centre(mud->surface, "Wilderness", x + 12,
-                                       mud->surface->height - 32, FONT_BOLD_12,
-                                       YELLOW);
+                                       bottom - 32, FONT_BOLD_12, YELLOW);
 
             int wilderness_level = 1 + (wilderness_depth / 6);
 
@@ -4911,8 +4957,7 @@ void mudclient_draw_game(mudclient *mud) {
             sprintf(formatted_level, "Level: %d", wilderness_level);
 
             surface_draw_string_centre(mud->surface, formatted_level, x + 12,
-                                       mud->surface->height - 19, FONT_BOLD_12,
-                                       YELLOW);
+                                       bottom - 19, FONT_BOLD_12, YELLOW);
 
             if (mud->show_wilderness_warning == 0) {
                 mud->show_wilderness_warning = 2;
@@ -4929,10 +4974,21 @@ void mudclient_draw_game(mudclient *mud) {
     mudclient_draw_chat_message_tabs_panel(mud);
     mudclient_draw_ui(mud);
 
-    mud->surface->draw_string_shadow = 0;
-    mudclient_draw_chat_message_tabs(mud);
+#ifdef IOS
+    /* the watch has no room for the chat tabs, or the status bars (the app
+     * shows hits, prayer and fatigue itself) */
+    int is_watch_ui = mudclient_ios_is_watch_ui();
+#else
+    int is_watch_ui = 0;
+#endif
 
-    if (mud->options->status_bars && mudclient_is_touch(mud)) {
+    mud->surface->draw_string_shadow = 0;
+
+    if (!is_watch_ui) {
+        mudclient_draw_chat_message_tabs(mud);
+    }
+
+    if (mud->options->status_bars && mudclient_is_touch(mud) && !is_watch_ui) {
         mud->surface->draw_string_shadow = 1;
         mudclient_draw_status_bars(mud);
     }
@@ -5114,7 +5170,20 @@ void mudclient_on_resize(mudclient *mud) {
 #endif
 
         // TODO change 12 to bar height - 1
-        scene_set_bounds(mud->scene, new_width, new_height - 12);
+        int bar_height = 12;
+
+#ifdef IOS
+        /* the bar is docked near the bottom, and the 3D view stops at it
+         * (message-tabs.c). the watch doesn't draw the bar, so the view
+         * goes all the way down */
+        if (mudclient_ios_is_watch_ui()) {
+            bar_height = 0;
+        } else {
+            bar_height += mudclient_bottom_bar_inset(mud);
+        }
+#endif
+
+        scene_set_bounds(mud->scene, new_width, new_height - bar_height);
 
 #ifdef RENDER_GL
         mudclient_update_fov(mud);

@@ -8,6 +8,26 @@ const char *combat_styles_compact[] = {
     "Controlled (+1 each)", "Aggressive (+3 str.)", "Accurate (+3 att.)",
     "Defensive (+3 def.)"};
 
+int mudclient_is_combat_style_shown(mudclient *mud) {
+#ifdef IOS
+    /* the watch app shows these itself */
+    if (mudclient_ios_is_watch_ui()) {
+        return 0;
+    }
+#endif
+
+    return mudclient_is_in_combat(mud) || mud->options->combat_style_always;
+}
+
+int mudclient_combat_style_bottom(mudclient *mud) {
+    int is_compact = mud->surface->width < 390;
+    int combat_button_height = is_compact ? 22 : 20;
+    int ui_y = mudclient_is_touch(mud) ? 140 + MUD_SAFE_TOP : 15;
+
+    /* the title and the four styles */
+    return ui_y + combat_button_height * 5;
+}
+
 void mudclient_draw_combat_style(mudclient *mud) {
     int is_compact = mud->surface->width < 390;
     int is_touch = mudclient_is_touch(mud);
@@ -15,8 +35,8 @@ void mudclient_draw_combat_style(mudclient *mud) {
     int combat_button_height = is_compact ? 22 : 20;
     int combat_style_width = is_compact ? 106 : 175;
 
-    int ui_x = is_touch ? 13 : 7;
-    int ui_y = is_touch ? 140 : 15;
+    int ui_x = is_touch ? 13 + MUD_SAFE_LEFT : 7;
+    int ui_y = is_touch ? 140 + MUD_SAFE_TOP : 15;
 
     int combat_styles_length = sizeof(combat_styles) / sizeof(combat_styles[0]);
 

@@ -398,12 +398,49 @@ int mudclient_ios_is_background(void);
 void mudclient_ios_save_combat_style(mudclient *mud);
 void mudclient_ios_restore_combat_style(mudclient *mud);
 int mudclient_ios_saved_combat_style(mudclient *mud);
+int mudclient_ios_is_watch_ui(void);
+/* how far the iPhone's native scrolling has moved the world list, in
+ * pixels; below 0 or past the end while it bounces */
+float mudclient_ios_world_list_scroll(void);
+/* where the world list was drawn, from the game thread */
+void mudclient_ios_publish_world_list(int x, int y, int width, int height,
+                                      int row_height, int count,
+                                      int selected);
+int mudclient_ios_ui_tabs_hidden(mudclient *mud);
+void mudclient_ios_show_menu(mudclient *mud);
+void mudclient_ios_on_message(char *message, int type);
+int mudclient_ios_has_accounts(void);
+/* the app's Stay connected in the background setting, for the Additional
+ * options checkbox; NULL on the watch, which can't */
+int *mudclient_ios_stay_connected(void);
+void mudclient_ios_request_accounts(void);
+void mudclient_ios_on_login(mudclient *mud, const char *username,
+                            const char *password);
+void mudclient_ios_on_login_status(const char *status,
+                                   const char *status_bottom);
+/* how far the touch controls stay in from each edge of the surface, clear
+ * of the iPhone's Dynamic Island, rounded corners and home indicator. the
+ * 3D view still fills the whole screen */
+int mudclient_ios_safe_inset(int edge);
+#define MUD_SAFE_TOP mudclient_ios_safe_inset(0)
+#define MUD_SAFE_LEFT mudclient_ios_safe_inset(1)
+#define MUD_SAFE_BOTTOM mudclient_ios_safe_inset(2)
+#define MUD_SAFE_RIGHT mudclient_ios_safe_inset(3)
+#define MUD_SCREEN_CORNER_RADIUS mudclient_ios_safe_inset(4)
 #else
 #ifdef SDL12
 void get_sdl_keycodes(SDL_keysym *keysym, char *char_code, int *code);
 #else
 void get_sdl_keycodes(SDL_Keysym *keysym, char *char_code, int *code);
 #endif
+#endif
+
+#ifndef MUD_SAFE_TOP
+#define MUD_SAFE_TOP 0
+#define MUD_SAFE_LEFT 0
+#define MUD_SAFE_BOTTOM 0
+#define MUD_SAFE_RIGHT 0
+#define MUD_SCREEN_CORNER_RADIUS 0
 #endif
 
 extern int mudclient_finger_1_x;
@@ -691,6 +728,7 @@ struct mudclient {
     int control_welcome_options;
     int control_welcome_worlds;
     int control_welcome_register;
+    int control_welcome_accounts;
     int refer_id;
     int control_login_new_ok;
     int control_register_status;
@@ -1007,6 +1045,10 @@ struct mudclient {
     int bank_last_scroll;
     int8_t bank_handle_dragged;
     int bank_visible_rows;
+
+    /* the bottom of the dialog drawn this frame (such as the bank), for the
+     * stat boosts to go under, or 0 */
+    int dialog_bottom;
     int8_t bank_search_focus;
 
     /* ./ui/shop.c */

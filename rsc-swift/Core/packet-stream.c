@@ -1,5 +1,9 @@
 #include "packet-stream.h"
 
+#ifdef IOS
+#include "relay-transport.h"
+#endif
+
 #ifdef HAVE_SIGNALS
 #include <signal.h>
 #endif
@@ -120,6 +124,27 @@ void packet_stream_new(PacketStream *packet_stream, mudclient *mud) {
 #endif
 
     int ret = 0;
+
+#ifdef IOS
+    /* watchOS only allows HTTPS, so connect through rsc-relay when the app
+     * has turned it on */
+    packet_stream->use_relay = relay_transport_enabled();
+
+    if (packet_stream->use_relay) {
+        packet_stream->socket = -1;
+
+        if (relay_transport_connect(mud->server, mud->port) < 0) {
+            mud_error("couldn't connect through the relay\n");
+            packet_stream->closed = 1;
+            return;
+        }
+
+        packet_stream->closed = 0;
+        packet_stream->packet_end = 3;
+        packet_stream->packet_max_length = 5000;
+        return;
+    }
+#endif
 
 #ifdef WII
     char local_ip[16] = {0};
@@ -289,16 +314,43 @@ void packet_stream_new(PacketStream *packet_stream, mudclient *mud) {
     packet_stream->packet_max_length = 5000;
 }
 
+/* recv() and write() on the socket, or the relay when connected through it */
+static int packet_stream_recv(PacketStream *packet_stream, void *buffer,
+                              int length) {
+#ifdef IOS
+    if (packet_stream->use_relay) {
+        return relay_transport_recv(buffer, length);
+    }
+#endif
+
+    return recv(packet_stream->socket, buffer, length, 0);
+}
+
+static int packet_stream_send(PacketStream *packet_stream, void *buffer,
+                              int length) {
+#ifdef IOS
+    if (packet_stream->use_relay) {
+        return relay_transport_send(buffer, length);
+    }
+#endif
+
+#if defined(WIN32) || defined(__SWITCH__)
+    return send(packet_stream->socket, buffer, length, 0);
+#else
+    return write(packet_stream->socket, buffer, length);
+#endif
+}
+
 int packet_stream_available_bytes(PacketStream *packet_stream, int length) {
     if (packet_stream->available_length >= length) {
         return 1;
     }
 
-    int bytes =
-        recv(packet_stream->socket,
-             packet_stream->available_buffer + packet_stream->available_offset +
-                 packet_stream->available_length,
-             length - packet_stream->available_length, 0);
+    int bytes = packet_stream_recv(
+        packet_stream,
+        packet_stream->available_buffer + packet_stream->available_offset +
+            packet_stream->available_length,
+        length - packet_stream->available_length);
 
     if (bytes < 0) {
         bytes = 0;
@@ -350,7 +402,7 @@ int packet_stream_read_bytes(PacketStream *packet_stream, int length,
     int offset = 0;
 
     while (length > 0) {
-        int bytes = recv(packet_stream->socket, buffer + offset, length, 0);
+        int bytes = packet_stream_recv(packet_stream, buffer + offset, length);
         if (bytes > 0) {
             length -= bytes;
             offset += bytes;
@@ -375,11 +427,7 @@ int packet_stream_read_bytes(PacketStream *packet_stream, int length,
 int packet_stream_write_bytes(PacketStream *packet_stream, int8_t *buffer,
                               int offset, int length) {
     if (!packet_stream->closed) {
-#if defined(WIN32) || defined(__SWITCH__)
-        return send(packet_stream->socket, buffer + offset, length, 0);
-#else
-        return write(packet_stream->socket, buffer + offset, length);
-#endif
+        return packet_stream_send(packet_stream, buffer + offset, length);
     }
 
     return -1;
@@ -756,6 +804,13 @@ int64_t packet_stream_get_long(PacketStream *packet_stream) {
 }
 
 void packet_stream_close(PacketStream *packet_stream) {
+#ifdef IOS
+    if (packet_stream->use_relay) {
+        relay_transport_close();
+        packet_stream->use_relay = 0;
+    }
+#endif
+
     if (packet_stream->socket > -1) {
         close(packet_stream->socket);
         packet_stream->socket = -1;

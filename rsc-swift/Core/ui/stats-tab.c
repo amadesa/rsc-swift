@@ -126,14 +126,22 @@ void mudclient_draw_equipment_status(mudclient *mud, int x, int y,
 }
 
 void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
-    int ui_x = mud->surface->width - STATS_WIDTH - 3;
+    /* wider on the watch, filling the space (ui-tabs.c) */
+    int panel_width = STATS_WIDTH;
+
+    int ui_x = mud->surface->width - panel_width - 3;
     int ui_y = UI_BUTTON_SIZE + 1;
 
     int height = STATS_HEIGHT;
 
     int is_touch = mudclient_is_touch(mud);
 
-    int is_compact = is_touch || mud->surface->height < (height + 12) + ui_y;
+    /* the watch has room for the full list, as on desktop (ui-tabs.c) */
+    int is_watch_area = mudclient_ui_tab_is_watch_area(mud);
+
+    int is_compact =
+        !is_watch_area &&
+        (is_touch || mud->surface->height < (height + 12) + ui_y);
 
     const char *stats_tabs[3];
 
@@ -169,15 +177,32 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
     if (is_touch) {
         height = 198;
-        ui_x = UI_TABS_TOUCH_X - STATS_WIDTH - 1;
+        ui_x = UI_TABS_TOUCH_X - panel_width - 1;
         ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
+    }
+
+    if (is_watch_area) {
+        mudclient_ui_tab_watch_area(mud, &ui_x, &ui_y, &panel_width, &height);
+
+        mud->panel_quests->control_width[mud->control_list_quest] =
+            panel_width;
+
+        mudclient_ui_tab_move_list(mud->panel_quests, mud->control_list_quest,
+                                   ui_x, ui_y + STATS_TAB_HEIGHT);
+    } else if (is_touch) {
+        /* as made, in case the watch's panels were on before */
+        mud->panel_quests->control_width[mud->control_list_quest] =
+            STATS_WIDTH;
+
+        mudclient_ui_tab_move_list(mud->panel_quests, mud->control_list_quest,
+                                   ui_x, ui_y + STATS_TAB_HEIGHT);
     }
 
     mud->panel_quests->control_height[mud->control_list_quest] =
         height - STATS_TAB_HEIGHT;
 
     if (mud->options->version_media >= 59) {
-            mudclient_draw_ui_tab_label(mud, STATS_TAB, STATS_WIDTH + !is_touch,
+            mudclient_draw_ui_tab_label(mud, STATS_TAB, panel_width + !is_touch,
                                         ui_x - !is_touch,
                                         ui_y - UI_TABS_LABEL_HEIGHT);
     }
@@ -188,19 +213,19 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
     mud->ui_tab_max_y = ui_y + height + 5;
 
     if (is_touch) {
-        mud->ui_tab_max_x = ui_x + STATS_WIDTH;
+        mud->ui_tab_max_x = ui_x + panel_width;
         mud->ui_tab_min_y = ui_y - UI_TABS_LABEL_HEIGHT;
         mud->ui_tab_max_y = ui_y + height;
     }
 
     surface_draw_box_alpha(mud->surface, ui_x, ui_y + STATS_TAB_HEIGHT,
-                           STATS_WIDTH, height - STATS_TAB_HEIGHT, GREY_DC,
+                           panel_width, height - STATS_TAB_HEIGHT, GREY_DC,
                            128);
 
     surface_draw_line_horizontal(mud->surface, ui_x, ui_y + STATS_TAB_HEIGHT,
-                                 STATS_WIDTH, BLACK);
+                                 panel_width, BLACK);
 
-    surface_draw_tabs(mud->surface, ui_x, ui_y, STATS_WIDTH, STATS_TAB_HEIGHT,
+    surface_draw_tabs(mud->surface, ui_x, ui_y, panel_width, STATS_TAB_HEIGHT,
                       stats_tabs, is_compact ? 3 : 2,
                       mud->ui_tab_stats_sub_tab);
 
@@ -219,7 +244,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
                                 FONT_BOLD_13, YELLOW);
 
             if (no_menus && mud->selected_wiki && mud->mouse_x > ui_x + 5 &&
-                mud->mouse_x < ui_x + (STATS_WIDTH / 2) - 8 &&
+                mud->mouse_x < ui_x + (panel_width / 2) - 8 &&
                 mud->mouse_y > y - (line_break - 1) && mud->mouse_y < y + 2) {
                 mudclient_menu_add_wiki(mud, "Skills", "Skills");
             }
@@ -234,11 +259,11 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
         if (mud->options->max_skills < 18) {
             skills_per_column = 8;
             display_skills = skill_names;
-            second_column_indent = ui_x + (STATS_WIDTH / 2) - 7;
+            second_column_indent = ui_x + (panel_width / 2) - 7;
         } else {
             skills_per_column = 9;
             display_skills = short_skill_names;
-            second_column_indent = ui_x + (STATS_WIDTH / 2) - 5;
+            second_column_indent = ui_x + (panel_width / 2) - 5;
         }
 
         /* draw two columns with each skill name and current/base levels */
@@ -251,7 +276,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
             if (no_menus && mud->mouse_x > ui_x + 3 &&
                 mud->mouse_y >= y - (line_break - 1) && mud->mouse_y < y + 2 &&
-                mud->mouse_x < ui_x + (STATS_WIDTH / 2) - 8) {
+                mud->mouse_x < ui_x + (panel_width / 2) - 8) {
                 text_colour = RED;
                 selected_skill = i;
             }
@@ -269,10 +294,12 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
             /* right column */
             text_colour = WHITE;
 
-            if (no_menus && mud->mouse_x >= ui_x + 90 &&
+            /* where the right column starts, moved over on the wider watch */
+            if (no_menus &&
+                mud->mouse_x >= ui_x + 90 + (panel_width - STATS_WIDTH) / 2 &&
                 mud->mouse_y >= y - (line_break * (is_compact ? 1 : 2)) &&
                 mud->mouse_y < y - (is_compact ? 0 : (line_break - 1)) &&
-                mud->mouse_x < ui_x + STATS_WIDTH) {
+                mud->mouse_x < ui_x + panel_width) {
                 text_colour = RED;
                 selected_skill = i + skills_per_column;
             }
@@ -318,7 +345,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
             char formatted_fatigue[27] = {0};
 
             if (no_menus && mud->selected_wiki && mud->mouse_x > ui_x + 5 &&
-                mud->mouse_x < ui_x + (STATS_WIDTH / 2) - 5 &&
+                mud->mouse_x < ui_x + (panel_width / 2) - 5 &&
                 mud->mouse_y > y - (line_break * 2) &&
                 mud->mouse_y < y - (line_break - 1)) {
                 mudclient_menu_add_wiki(mud, "Fatigue", "Fatigue");
@@ -345,7 +372,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
         }
 
         surface_draw_line_horizontal(
-            mud->surface, ui_x, y - (is_compact ? 12 : 15), STATS_WIDTH, BLACK);
+            mud->surface, ui_x, y - (is_compact ? 12 : 15), panel_width, BLACK);
 
         char formatted_number[15] = {0};
 
@@ -543,7 +570,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
      * quest list */
     int is_within_x = mud->options->off_handle_scroll_drag
                           ? 1
-                          : mouse_x >= 0 && mouse_x < STATS_WIDTH;
+                          : mouse_x >= 0 && mouse_x < panel_width;
 
     if (is_within_x && mouse_y >= 0 && mouse_y < height) {
         int quest_tab = is_compact ? 2 : 1;
@@ -564,7 +591,7 @@ void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus) {
 
         if (mouse_y <= STATS_TAB_HEIGHT) {
             int total_tabs = is_compact ? 3 : 2;
-            int selected_tab = mouse_x / (STATS_WIDTH / total_tabs);
+            int selected_tab = mouse_x / (panel_width / total_tabs);
 
             if (selected_tab < 0 || selected_tab >= total_tabs) {
                 return;

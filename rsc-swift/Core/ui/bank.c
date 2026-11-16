@@ -327,7 +327,8 @@ void mudclient_draw_bank(mudclient *mud) {
     int horizontal_padding = (is_compact ? 100 : 142) + (is_touch ? 18 : 0);
 
     int visible_rows = mud->options->bank_expand
-                           ? (mud->surface->height - horizontal_padding) /
+                           ? (mud->surface->height - MUD_SAFE_TOP -
+                              MUD_SAFE_BOTTOM - horizontal_padding) /
                                  ITEM_GRID_SLOT_HEIGHT
                            : BANK_ROWS;
 
@@ -460,18 +461,21 @@ void mudclient_draw_bank(mudclient *mud) {
     int columns = mud->surface->height < 260 ? 6 : 5;
     int inventory_width = ITEM_GRID_SLOT_WIDTH * columns;
 
+    /* the side inventory is kept in from the right edge (inventory-tab.c) */
+    int screen_width = mud->surface->width - MUD_SAFE_RIGHT;
+
     int show_inventory =
         mud->options->bank_inventory &&
-        mud->surface->width > inventory_width + bank_width + 15;
+        screen_width > inventory_width + bank_width + 15;
 
     if (show_inventory) {
         mudclient_draw_ui_tab_inventory(mud, !mud->show_right_click_menu &&
                                                  !mud->show_dialog_offer_x);
     }
 
-    int contain_width = show_inventory && mud->surface->width <
+    int contain_width = show_inventory && screen_width <
                                               inventory_width + bank_width + 265
-                            ? mud->surface->width - inventory_width - 4
+                            ? screen_width - inventory_width - 4
                             : mud->surface->width;
 
     int ui_x = (contain_width / 2) - (bank_width / 2);
@@ -483,7 +487,7 @@ void mudclient_draw_bank(mudclient *mud) {
     }
 
     if (is_touch) {
-        ui_y = 34;
+        ui_y = 34 + MUD_SAFE_TOP;
     }
 
     int item_grid_y = ui_y + 28 - offset_y;
@@ -644,7 +648,7 @@ void mudclient_draw_bank(mudclient *mud) {
     }
 
     int mouse_in_inventory =
-        show_inventory && mud->mouse_x > mud->surface->width - inventory_width;
+        show_inventory && mud->mouse_x > screen_width - inventory_width;
 
     if (!mud->show_right_click_menu && mud->mouse_button_click != 0 &&
         !mouse_in_inventory) {
@@ -933,6 +937,11 @@ void mudclient_draw_bank(mudclient *mud) {
                              mud->input_pm_current,
                              mud->bank_search_focus ? '*' : ' ');
     }
+
+    mud->dialog_bottom =
+        ui_y + item_grid_height +
+        (mud->options->bank_search ? (is_compact ? 70 : 96)
+                                   : 76 - (offset_y * 2));
 
     if (item_id != -1) {
         int bank_count = bank_items_count[mud->bank_selected_item_slot];

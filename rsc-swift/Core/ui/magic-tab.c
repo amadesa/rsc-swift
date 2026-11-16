@@ -3,7 +3,10 @@
 static const char *magic_tabs[] = {"Magic", "Prayers"};
 
 void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
-    int ui_x = mud->surface->width - MAGIC_WIDTH - 3;
+    /* wider on the watch, filling the space (ui-tabs.c) */
+    int panel_width = MAGIC_WIDTH;
+
+    int ui_x = mud->surface->width - panel_width - 3;
     int ui_y = UI_BUTTON_SIZE + 1;
 
     int height = MAGIC_HEIGHT;
@@ -12,12 +15,40 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
 
     if (is_touch) {
         height = 198;
-        ui_x = UI_TABS_TOUCH_X - MAGIC_WIDTH - 1;
+        ui_x = UI_TABS_TOUCH_X - panel_width - 1;
         ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
     }
 
+    if (mudclient_ui_tab_is_watch_area(mud)) {
+        mudclient_ui_tab_watch_area(mud, &ui_x, &ui_y, &panel_width, &height);
+
+        /* the spell list takes the extra height; the description under it
+         * keeps the room it has on the iPhone (see mudclient_start_game) */
+        int description_height = 198 - MAGIC_TAB_HEIGHT - (90 + 16);
+
+        Panel *panel = mud->panel_magic;
+        int list = mud->control_list_magic;
+
+        panel->control_width[list] = panel_width;
+        panel->control_height[list] =
+            height - MAGIC_TAB_HEIGHT - description_height;
+
+        /* under the Magic/Prayers tabs */
+        mudclient_ui_tab_move_list(panel, list, ui_x, ui_y + MAGIC_TAB_HEIGHT);
+    } else if (is_touch) {
+        /* as made (mudclient_start_game), in case the watch's panels were
+         * on before, and where the watch's taller icons put the panel */
+        Panel *panel = mud->panel_magic;
+        int list = mud->control_list_magic;
+
+        panel->control_width[list] = MAGIC_WIDTH;
+        panel->control_height[list] = 90 + 16;
+
+        mudclient_ui_tab_move_list(panel, list, ui_x, ui_y + MAGIC_TAB_HEIGHT);
+    }
+
     if (mud->options->version_media >= 59) {
-        mudclient_draw_ui_tab_label(mud, MAGIC_TAB, MAGIC_WIDTH + !is_touch,
+        mudclient_draw_ui_tab_label(mud, MAGIC_TAB, panel_width + !is_touch,
                                     ui_x - !is_touch,
                                     ui_y - UI_TABS_LABEL_HEIGHT);
     }
@@ -28,13 +59,13 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
     mud->ui_tab_max_y = 240;
 
     if (is_touch) {
-        mud->ui_tab_max_x = ui_x + MAGIC_WIDTH;
+        mud->ui_tab_max_x = ui_x + panel_width;
         mud->ui_tab_min_y = ui_y - UI_TABS_LABEL_HEIGHT;
         mud->ui_tab_max_y = ui_y + height;
     }
 
     surface_draw_box_alpha(mud->surface, ui_x, ui_y + MAGIC_TAB_HEIGHT,
-                           MAGIC_WIDTH, height - MAGIC_TAB_HEIGHT, GREY_DC,
+                           panel_width, height - MAGIC_TAB_HEIGHT, GREY_DC,
                            128);
 
     int spell_list_height =
@@ -42,12 +73,12 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
 
     int description_y = ui_y + spell_list_height + MAGIC_TAB_HEIGHT - 1;
 
-    surface_draw_line_horizontal(mud->surface, ui_x, description_y, MAGIC_WIDTH,
+    surface_draw_line_horizontal(mud->surface, ui_x, description_y, panel_width,
                                  BLACK);
 
     description_y += 11;
 
-    surface_draw_tabs(mud->surface, ui_x, ui_y, MAGIC_WIDTH, MAGIC_TAB_HEIGHT,
+    surface_draw_tabs(mud->surface, ui_x, ui_y, panel_width, MAGIC_TAB_HEIGHT,
                       magic_tabs, 2, mud->ui_tab_magic_sub_tab);
 
     int mouse_x = mud->mouse_x - ui_x;
@@ -213,19 +244,19 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
                     game_data.prayers[prayer_index].level, prayer_name);
 
             surface_draw_string_centre(mud->surface, formatted_prayer,
-                                       ui_x + (MAGIC_WIDTH / 2),
+                                       ui_x + (panel_width / 2),
                                        description_y + 6, FONT_BOLD_12, YELLOW);
 
             surface_draw_string_centre(
                 mud->surface, game_data.prayers[prayer_index].description,
-                ui_x + (MAGIC_WIDTH / 2), description_y + 21, FONT_REGULAR_11,
+                ui_x + (panel_width / 2), description_y + 21, FONT_REGULAR_11,
                 WHITE);
 
             sprintf(formatted_prayer, "Drain rate: %d",
                     game_data.prayers[prayer_index].drain);
 
             surface_draw_string_centre(mud->surface, formatted_prayer,
-                                       ui_x + (MAGIC_WIDTH / 2),
+                                       ui_x + (panel_width / 2),
                                        description_y + 36, FONT_BOLD_12, BLACK);
 
             if (mud->selected_wiki && no_menus) {
@@ -255,7 +286,7 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
     if (!handle_panel_input_early) {
         int is_within_x = mud->options->off_handle_scroll_drag
                               ? 1
-                              : mouse_x >= 0 && mouse_x < MAGIC_WIDTH;
+                              : mouse_x >= 0 && mouse_x < panel_width;
 
         if (!is_within_x || !(mouse_y >= 0 && mouse_y < height)) {
             return;
@@ -267,10 +298,10 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
     }
 
     if (mouse_y <= MAGIC_TAB_HEIGHT && mud->mouse_button_click == 1) {
-        if (mouse_x < (MAGIC_WIDTH / 2) && mud->ui_tab_magic_sub_tab == 1) {
+        if (mouse_x < (panel_width / 2) && mud->ui_tab_magic_sub_tab == 1) {
             mud->ui_tab_magic_sub_tab = 0;
             panel_reset_list(mud->panel_magic, mud->control_list_magic);
-        } else if (mouse_x > (MAGIC_WIDTH / 2) &&
+        } else if (mouse_x > (panel_width / 2) &&
                    mud->ui_tab_magic_sub_tab == 0) {
             mud->ui_tab_magic_sub_tab = 1;
             panel_reset_list(mud->panel_magic, mud->control_list_magic);

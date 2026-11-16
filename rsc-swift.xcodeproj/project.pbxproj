@@ -6,7 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B0A7C0000000000000000014 /* rsc-watch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B0A7C0000000000000000001 /* rsc-watch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		B0A7C0000000000000000012 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F8A2CFDC30734EC200CBB279 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B0A7C0000000000000000004;
+			remoteInfo = "rsc-watch";
+		};
 		F8A2CFF330734EC700CBB279 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F8A2CFDC30734EC200CBB279 /* Project object */;
@@ -23,16 +34,66 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		B0A7C0000000000000000013 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				B0A7C0000000000000000014 /* rsc-watch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		A11CE0000000000000000001 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		B0A7C0000000000000000001 /* rsc-watch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "rsc-watch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8A2CFE430734EC200CBB279 /* rsc-swift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "rsc-swift.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8A2CFF230734EC700CBB279 /* rsc-swiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "rsc-swiftTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8A2CFFC30734EC700CBB279 /* rsc-swiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "rsc-swiftUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B0A7C0000000000000000003 /* Exceptions for "rsc-swift" folder in "rsc-watch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AccountsController.swift,
+				AddWorldController.swift,
+				AppDelegate.swift,
+				Assets.xcassets,
+				FrameDisplay.swift,
+				FrameRenderer.swift,
+				FrameShaders.metal,
+				GameAudio.swift,
+				GameClient.swift,
+				GameView.swift,
+				GameViewController.swift,
+				LaunchScreen.storyboard,
+				PhoneWatchSync.swift,
+				RelayController.swift,
+				RelayPairing.swift,
+				SceneDelegate.swift,
+				Settings.bundle,
+				WorldConfig.swift,
+			);
+			target = B0A7C0000000000000000004 /* rsc-watch */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B0A7C0000000000000000002 /* Watch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Watch;
+			sourceTree = "<group>";
+		};
 		F8A2CFE630734EC200CBB279 /* rsc-swift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B0A7C0000000000000000003 /* Exceptions for "rsc-swift" folder in "rsc-watch" target */,
+			);
 			path = "rsc-swift";
 			sourceTree = "<group>";
 		};
@@ -49,6 +110,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B0A7C0000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F8A2CFE130734EC200CBB279 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -86,6 +154,7 @@
 			children = (
 				A11CE0000000000000000002 /* Config */,
 				F8A2CFE630734EC200CBB279 /* rsc-swift */,
+				B0A7C0000000000000000002 /* Watch */,
 				F8A2CFF530734EC700CBB279 /* rsc-swiftTests */,
 				F8A2CFFF30734EC700CBB279 /* rsc-swiftUITests */,
 				F8A2CFE530734EC200CBB279 /* Products */,
@@ -96,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				F8A2CFE430734EC200CBB279 /* rsc-swift.app */,
+				B0A7C0000000000000000001 /* rsc-watch.app */,
 				F8A2CFF230734EC700CBB279 /* rsc-swiftTests.xctest */,
 				F8A2CFFC30734EC700CBB279 /* rsc-swiftUITests.xctest */,
 			);
@@ -105,6 +175,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B0A7C0000000000000000004 /* rsc-watch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B0A7C0000000000000000008 /* Build configuration list for PBXNativeTarget "rsc-watch" */;
+			buildPhases = (
+				B0A7C0000000000000000005 /* Sources */,
+				B0A7C0000000000000000006 /* Frameworks */,
+				B0A7C0000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B0A7C0000000000000000002 /* Watch */,
+				F8A2CFE630734EC200CBB279 /* rsc-swift */,
+			);
+			name = "rsc-watch";
+			packageProductDependencies = (
+			);
+			productName = "rsc-watch";
+			productReference = B0A7C0000000000000000001 /* rsc-watch.app */;
+			productType = "com.apple.product-type.application";
+		};
 		F8A2CFE330734EC200CBB279 /* rsc-swift */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F8A2D00630734EC700CBB279 /* Build configuration list for PBXNativeTarget "rsc-swift" */;
@@ -112,10 +205,12 @@
 				F8A2CFE030734EC200CBB279 /* Sources */,
 				F8A2CFE130734EC200CBB279 /* Frameworks */,
 				F8A2CFE230734EC200CBB279 /* Resources */,
+				B0A7C0000000000000000013 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B0A7C0000000000000000011 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F8A2CFE630734EC200CBB279 /* rsc-swift */,
@@ -183,6 +278,9 @@
 				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
+					B0A7C0000000000000000004 = {
+						CreatedOnToolsVersion = 16.4;
+					};
 					F8A2CFE330734EC200CBB279 = {
 						CreatedOnToolsVersion = 16.4;
 					};
@@ -213,11 +311,19 @@
 				F8A2CFE330734EC200CBB279 /* rsc-swift */,
 				F8A2CFF130734EC700CBB279 /* rsc-swiftTests */,
 				F8A2CFFB30734EC700CBB279 /* rsc-swiftUITests */,
+				B0A7C0000000000000000004 /* rsc-watch */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B0A7C0000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F8A2CFE230734EC200CBB279 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -242,6 +348,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B0A7C0000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F8A2CFE030734EC200CBB279 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -266,6 +379,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		B0A7C0000000000000000011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B0A7C0000000000000000004 /* rsc-watch */;
+			targetProxy = B0A7C0000000000000000012 /* PBXContainerItemProxy */;
+		};
 		F8A2CFF430734EC700CBB279 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = F8A2CFE330734EC200CBB279 /* rsc-swift */;
@@ -279,6 +397,90 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		B0A7C0000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					IOS,
+					RENDER_SW,
+				);
+				GCC_WARN_INHIBIT_ALL_WARNINGS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Watch-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = RSC;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(BUNDLE_ID_PREFIX).rscswift";
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.2;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fwrapv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BUNDLE_ID_PREFIX).rscswift.watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "rsc-swift/rsc-swift-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 7.0;
+			};
+			name = Debug;
+		};
+		B0A7C0000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					IOS,
+					RENDER_SW,
+				);
+				GCC_WARN_INHIBIT_ALL_WARNINGS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Watch-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = RSC;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(BUNDLE_ID_PREFIX).rscswift";
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.2;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fwrapv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(BUNDLE_ID_PREFIX).rscswift.watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "rsc-swift/rsc-swift-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 7.0;
+			};
+			name = Release;
+		};
 		F8A2D00430734EC700CBB279 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A11CE0000000000000000001 /* Base.xcconfig */;
@@ -416,11 +618,13 @@
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RSC;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -467,11 +671,13 @@
 				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RSC;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -586,6 +792,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		B0A7C0000000000000000008 /* Build configuration list for PBXNativeTarget "rsc-watch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0A7C0000000000000000009 /* Debug */,
+				B0A7C0000000000000000010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F8A2CFDF30734EC200CBB279 /* Build configuration list for PBXProject "rsc-swift" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -72,6 +72,13 @@ final class AddWorldController: NSObject {
                 return
             }
 
+            // the app allows any connection for the relay's own port (pinned
+            // in RelayRoute), so this is where plain HTTP is kept out
+            guard url.scheme?.lowercased() == "https" else {
+                showError("The link has to start with https://")
+                return
+            }
+
             download(url)
         })
 

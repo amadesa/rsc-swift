@@ -645,10 +645,13 @@ void mudclient_create_top_mouse_menu(mudclient *mud) {
                 y_offset = 18;
             }
 
-            y_position = mud->surface->height - y_offset;
+            y_position =
+                mud->surface->height - mudclient_bottom_bar_inset(mud) -
+                y_offset;
+            x_position += MUD_SAFE_LEFT;
 
             if (mud->is_in_wilderness) {
-                x_position = 76;
+                x_position = 76 + MUD_SAFE_LEFT;
             }
         }
 
@@ -695,23 +698,34 @@ void mudclient_create_top_mouse_menu(mudclient *mud) {
         mud->menu_y = mud->mouse_y - 7;
         mud->show_right_click_menu = 1;
 
-        if (mud->menu_x + mud->menu_width > mud->surface->width - 2) {
-            mud->menu_x = mud->surface->width - 2 - mud->menu_width;
+        /* kept clear of the Dynamic Island, corners and home indicator */
+        int max_x = mud->surface->width - MUD_SAFE_RIGHT - 2;
+        int max_y = mud->surface->height - MUD_SAFE_BOTTOM - 31;
+
+        if (mud->menu_x + mud->menu_width > max_x) {
+            mud->menu_x = max_x - mud->menu_width;
         }
 
-        if (mud->menu_y + mud->menu_height > mud->surface->height - 31) {
-            mud->menu_y = mud->surface->height - 31 - mud->menu_height;
+        if (mud->menu_y + mud->menu_height > max_y) {
+            mud->menu_y = max_y - mud->menu_height;
         }
 
-        if (mud->menu_x < 0) {
-            mud->menu_x = 0;
+        if (mud->menu_x < MUD_SAFE_LEFT) {
+            mud->menu_x = MUD_SAFE_LEFT;
         }
 
-        if (mud->menu_y < 0) {
-            mud->menu_y = 0;
+        if (mud->menu_y < MUD_SAFE_TOP) {
+            mud->menu_y = MUD_SAFE_TOP;
         }
 
         mud->mouse_button_click = 0;
+
+#ifdef IOS
+        /* too small to read on a watch, so the app shows it instead */
+        if (mudclient_ios_is_watch_ui()) {
+            mudclient_ios_show_menu(mud);
+        }
+#endif
     }
 }
 
@@ -1588,6 +1602,13 @@ void mudclient_create_right_click_menu(mudclient *mud) {
 }
 
 void mudclient_draw_right_click_menu(mudclient *mud) {
+#ifdef IOS
+    /* the watch app shows the menu, and answers with rsc_choose_menu_item */
+    if (mudclient_ios_is_watch_ui()) {
+        return;
+    }
+#endif
+
     int is_touch = mudclient_is_touch(mud);
     int entry_height = get_entry_height(mud);
 

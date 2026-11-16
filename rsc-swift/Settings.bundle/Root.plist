@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>StringsTable</key>
+	<string>Root</string>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Background</string>
+			<key>FooterText</key>
+			<string>Keeps you logged in and alerts working after you leave RSC or lock the iPhone, by playing silence alongside your other audio. Music and videos carry on as normal. Uses more battery. Calls and alarms can still pause it. Otherwise iOS stops RSC about 30 seconds after you leave it.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Stay connected in the background</string>
+			<key>Key</key>
+			<string>stay_connected_in_background</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Relay</string>
+			<key>FooterText</key>
+			<string>Connects to game servers through an rsc-relay over HTTPS instead of directly, as the Apple Watch app has to. Applies the next time the app starts. See relay/README.md in the source.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Connect through relay</string>
+			<key>Key</key>
+			<string>relay_enabled</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+			<key>Title</key>
+			<string>Relay address</string>
+			<key>Key</key>
+			<string>relay_url</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>KeyboardType</key>
+			<string>URL</string>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTextFieldSpecifier</string>
+			<key>Title</key>
+			<string>Token</string>
+			<key>Key</key>
+			<string>relay_token</string>
+			<key>DefaultValue</key>
+			<string></string>
+			<key>IsSecure</key>
+			<true/>
+			<key>AutocapitalizationType</key>
+			<string>None</string>
+			<key>AutocorrectionType</key>
+			<string>No</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Alerts</string>
+			<key>FooterText</key>
+			<string>A vibration while you play, or a notification while RSC is in the background, on this iPhone and in the Apple Watch app. iPhone notifications also show on a paired Apple Watch while the iPhone is locked, but iOS stops RSC about 30 seconds after you leave it. Open RSC on this iPhone afterwards to send changes to the watch.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Hits below 20%</string>
+			<key>Key</key>
+			<string>alert_hits_20</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Hits below 10%</string>
+			<key>Key</key>
+			<string>alert_hits_10</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Standing in one spot</string>
+			<key>Key</key>
+			<string>alert_same_spot</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Fatigue 95% and 100%</string>
+			<key>Key</key>
+			<string>alert_fatigue</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>About to idle log out</string>
+			<key>Key</key>
+			<string>alert_idle_logout</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Logged out or disconnected</string>
+			<key>Key</key>
+			<string>alert_logged_out</string>
+			<key>DefaultValue</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Died</string>
+			<key>Key</key>
+			<string>alert_death</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Inventory full</string>
+			<key>Key</key>
+			<string>alert_inventory_full</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Level up</string>
+			<key>Key</key>
+			<string>alert_level_up</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSToggleSwitchSpecifier</string>
+			<key>Title</key>
+			<string>Private messages, trades and duels</string>
+			<key>Key</key>
+			<string>alert_messages</string>
+			<key>DefaultValue</key>
+			<false/>
+		</dict>
+	</array>
+</dict>
+</plist>

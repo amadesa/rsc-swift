@@ -9,6 +9,7 @@ final class GameView: UIView {
     private let textProxy = KeyboardProxyField(isPassword: false)
     private let passwordProxy = KeyboardProxyField(isPassword: true)
     private var activeProxy: KeyboardProxyField?
+    private let worldList = WorldListScroller()
 
     /// True while the game has a text field focused.
     private(set) var isTyping = false
@@ -35,6 +36,22 @@ final class GameView: UIView {
         textProxy.delegate = self
         passwordProxy.delegate = self
         addSubview(textProxy)
+
+        worldList.isHidden = true
+        addSubview(worldList)
+    }
+
+    /// Shows the native scrolling over the Worlds screen's list while it's
+    /// up. Called a few times a second.
+    func updateWorldList(_ state: RscLoginState, isLoggedIn: Bool) {
+        let isShowing = state.ready != 0 && !isLoggedIn
+            && state.screen == RSC_LOGIN_SCREEN_WORLDS.rawValue && state.options_open == 0
+            && state.world_list_height > 0 && state.frame_width > 0 && state.frame_height > 0
+
+        worldList.isHidden = !isShowing
+        if isShowing {
+            worldList.update(state, in: bounds.size)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -114,6 +131,115 @@ final class GameView: UIView {
         activeProxy?.resignFirstResponder()
         passwordProxy.removeFromSuperview()
     }
+}
+
+/// Makes the Worlds screen's list scroll like any iOS list: momentum,
+/// rubber-banding, flicking. The game still draws it in its own font and
+/// colours (worldlist_draw_scrolling); this transparent scroll view over it
+/// only tracks the finger and tells the game how far it has scrolled, and
+/// turns taps into choosing a world.
+private final class WorldListScroller: UIScrollView, UIScrollViewDelegate {
+    /// frame pixels to points
+    private var scale: CGFloat = 1
+    private var rowHeight: CGFloat = 18
+    private var count = 0
+    private var selected = -1
+    /// the frame position and size of the list, to notice a rebuilt layout
+    private var layout: [Int32] = []
+
+    init() {
+        super.init(frame: .zero)
+
+        backgroundColor = .clear
+        showsVerticalScrollIndicator = false // the game draws its own
+        showsHorizontalScrollIndicator = false
+        alwaysBounceVertical = true
+        delegate = self
+        if #available(iOS 11.0, *) {
+            contentInsetAdjustmentBehavior = .never
+        }
+
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(_ state: RscLoginState, in viewSize: CGSize) {
+        let newLayout = [state.frame_width, state.frame_height, state.world_list_x,
+                         state.world_list_y, state.world_list_width, state.world_list_height]
+
+        if newLayout != layout || Int(state.world_count) != count {
+            layout = newLayout
+            scale = viewSize.width / CGFloat(state.frame_width)
+            rowHeight = CGFloat(state.world_list_row_height)
+            count = Int(state.world_count)
+
+            frame = CGRect(
+                x: CGFloat(state.world_list_x) * scale, y: CGFloat(state.world_list_y) * scale,
+                width: CGFloat(state.world_list_width) * scale,
+                height: CGFloat(state.world_list_height) * scale)
+            contentSize = CGSize(width: frame.width, height: CGFloat(count) * rowHeight * scale)
+
+            // keep the offset in range, e.g. after removing a world
+            let maxOffset = max(0, contentSize.height - frame.height)
+            if contentOffset.y > maxOffset {
+                contentOffset.y = maxOffset
+            }
+        }
+
+        // bring a newly selected world (just added, or restored) into view
+        let newSelected = Int(state.world_selected)
+        if newSelected != selected {
+            selected = newSelected
+            if selected >= 0 && !isTracking && !isDecelerating {
+                let row = CGRect(x: 0, y: CGFloat(selected) * rowHeight * scale,
+                                 width: frame.width, height: rowHeight * scale)
+                scrollRectToVisible(row, animated: true)
+            }
+        }
+
+        sendOffset()
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        sendOffset()
+    }
+
+    private func sendOffset() {
+        rsc_set_world_list_scroll(Float(contentOffset.y / scale))
+    }
+
+    @objc private func tapped(_ tap: UITapGestureRecognizer) {
+        let point = tap.location(in: self) // in content, so offset included
+        let scrollbarWidth = 14 * scale
+
+        // the game's scrollbar arrows step a row, as they always did
+        if contentSize.height > bounds.height && point.x > bounds.width - scrollbarWidth {
+            let y = point.y - contentOffset.y
+            let step = rowHeight * scale
+            let maxOffset = contentSize.height - bounds.height
+            if y < 12 * scale {
+                setContentOffset(CGPoint(x: 0, y: max(0, contentOffset.y - step)), animated: true)
+            } else if y > bounds.height - 12 * scale {
+                setContentOffset(CGPoint(x: 0, y: min(maxOffset, contentOffset.y + step)), animated: true)
+            }
+            return
+        }
+
+        let row = Int(point.y / (rowHeight * scale))
+        if row >= 0 && row < count {
+            rsc_choose_world(Int32(row))
+        }
+    }
+
+    // touches here are the list's alone; without these UIView would pass
+    // them on to the game view as taps on the game
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {}
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {}
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {}
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {}
 }
 
 /// The on-screen keyboard types into this invisible text field rather than

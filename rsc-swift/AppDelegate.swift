@@ -8,6 +8,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        GameClient.registerDefaults()
+
+        // before anything else, as iOS may have started the app in the
+        // background for a message from the watch
+        PhoneWatchSync.shared.activate()
+
         // iOS 13 and later create the window in SceneDelegate
         if #available(iOS 13.0, *) {
             return true

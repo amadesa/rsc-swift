@@ -1,12 +1,18 @@
 #include "option-menu.h"
+#include "combat-style.h"
 
 void mudclient_draw_option_menu(mudclient *mud) {
     int is_touch = mudclient_is_touch(mud);
 
     FontStyle font_style = is_touch ? FONT_BOLD_14 : FONT_BOLD_12;
     int font_height = is_touch ? 24 : 12;
-    int ui_x = is_touch ? 12 : 6;
-    int ui_y = is_touch ? 136 : 0;
+    int ui_x = is_touch ? 12 + MUD_SAFE_LEFT : 6;
+    int ui_y = is_touch ? 136 + MUD_SAFE_TOP : 0;
+
+    /* keep the combat style box clear, as it's in the same corner */
+    if (is_touch && mudclient_is_combat_style_shown(mud)) {
+        ui_y = mudclient_combat_style_bottom(mud) + 4;
+    }
 
     if (mud->options->option_numbers) {
         int index = -1;

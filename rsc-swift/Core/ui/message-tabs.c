@@ -39,13 +39,23 @@ void mudclient_create_message_tabs_panel(mudclient *mud) {
     panel_set_focus(mud->panel_message_tabs, mud->control_text_list_all);
 }
 
+/* the width the touch chat tabs have between the safe insets */
+static int message_tabs_width(mudclient *mud) {
+    if (!mudclient_is_touch(mud)) {
+        return mud->surface->width;
+    }
+
+    return mud->surface->width - MUD_SAFE_LEFT - MUD_SAFE_RIGHT;
+}
+
 void mudclient_draw_chat_message_tabs(mudclient *mud) {
-    int is_compact = mud->surface->width < MUD_VANILLA_WIDTH;
+    int tabs_width = message_tabs_width(mud);
+    int is_compact = tabs_width < MUD_VANILLA_WIDTH;
     int is_touch = mudclient_is_touch(mud);
 
     Panel *panel = mud->panel_message_tabs;
 
-    int panel_width = (is_compact ? mud->surface->width : MUD_VANILLA_WIDTH) -
+    int panel_width = (is_compact ? tabs_width : MUD_VANILLA_WIDTH) -
                       14 - (is_touch ? 14 : 0);
 
     panel->control_width[mud->control_text_list_all] = panel_width;
@@ -56,10 +66,22 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
     int x = 0;
     int y = mud->surface->height - 16 + (is_compact ? 1 : 0);
 
-    int button_width = is_compact ? (int)(mud->surface->width * 0.245f) : 100;
+    if (is_touch) {
+        /* the bar under the status bars, as low as the corners allow */
+        y -= mudclient_bottom_bar_inset(mud);
+    }
+
+    int button_width = is_compact ? (int)(tabs_width * 0.245f) : 100;
 
     if (is_touch) {
         surface_draw_sprite(mud->surface, x, y + 4, mud->sprite_media + 22);
+
+        /* dock the bar to the bottom of the screen, under the home
+         * indicator, rather than leave it floating over the 3D view */
+        if (mudclient_bottom_bar_inset(mud) > 0) {
+            surface_draw_box(mud->surface, 0, y + 16, mud->surface->width,
+                             mud->surface->height - (y + 16), BLACK);
+        }
     } else if (is_compact) {
         int bar_width =
             is_compact ? mud->surface->width + button_width : HBAR_WIDTH;
@@ -98,11 +120,8 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
     }
 
     if (is_touch) {
-        x = 9;
-        y = 24;
-
-        int button_width =
-            is_compact ? (int)(mud->surface->width * 0.245f) : 100;
+        x = 9 + MUD_SAFE_LEFT;
+        y = 24 + MUD_SAFE_TOP;
 
         for (int i = 0; i < 4 + (!is_compact); i++) {
             int button_x = x + (i * button_width) + (i == 4 ? 1 : 0);
@@ -122,7 +141,7 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
         y = mud->surface->height - 6 + (is_compact ? 1 : 0);
     }
 
-    x = (int)(button_width * 0.54f);
+    x = (int)(button_width * 0.54f) + (is_touch ? MUD_SAFE_LEFT : 0);
 
     int text_colour = MESSAGE_TAB_PURPLE;
 
@@ -194,13 +213,20 @@ void mudclient_draw_chat_message_tabs(mudclient *mud) {
  * right, so the visible button did nothing) */
 void mudclient_get_keyboard_button_position(mudclient *mud, int *x, int *y) {
     /* default to left */
-    *x = 9;
-    *y = 108;
+    *x = 9 + MUD_SAFE_LEFT;
+    *y = 108 + MUD_SAFE_TOP;
 
-    if (mud->options->touch_keyboard_right) {
+#ifdef IOS
+    int is_watch_ui = mudclient_ios_is_watch_ui();
+#else
+    int is_watch_ui = 0;
+#endif
+
+    /* on the watch the right edge is taken by the bigger tab icons */
+    if (mud->options->touch_keyboard_right && !is_watch_ui) {
         /* just above the ui tab icons */
-        *x = mud->surface->width - 50;
-        *y = mud->surface->height - 265;
+        *x = mud->surface->width - MUD_SAFE_RIGHT - 50;
+        *y = mud->surface->height - MUD_SAFE_BOTTOM - 265;
     }
 }
 
@@ -208,8 +234,8 @@ void mudclient_draw_chat_message_tabs_panel(mudclient *mud) {
     int is_touch = mudclient_is_touch(mud);
 
     if (mud->message_tab_selected == MESSAGE_TAB_ALL) {
-        int x = 5 + (is_touch ? 5 : 0);
-        int y = is_touch ? 91 : mud->surface->height - 30;
+        int x = 5 + (is_touch ? 5 + MUD_SAFE_LEFT : 0);
+        int y = is_touch ? 91 + MUD_SAFE_TOP : mud->surface->height - 30;
 
         for (int i = 0; i < MESSAGE_HISTORY_LENGTH; i++) {
             if (mud->message_history_timeout[i] <= 0) {
@@ -233,11 +259,36 @@ void mudclient_draw_chat_message_tabs_panel(mudclient *mud) {
         panel_show(mud->panel_message_tabs, mud->control_text_list_private);
     }
 
+#ifdef IOS
+    /* the watch types into its own text field, so leave out the chat input
+     * line (it still takes the typing) */
+    int is_input_hidden = mudclient_ios_is_watch_ui() &&
+        mud->panel_message_tabs->control_shown[mud->control_text_list_all];
+
+    if (is_input_hidden) {
+        mud->panel_message_tabs->control_shown[mud->control_text_list_all] = 0;
+    }
+#endif
+
     panel_text_list_entry_height_mod = 2;
     panel_draw_panel(mud->panel_message_tabs);
     panel_text_list_entry_height_mod = 0;
 
-    if (is_touch) {
+#ifdef IOS
+    if (is_input_hidden) {
+        mud->panel_message_tabs->control_shown[mud->control_text_list_all] = 1;
+    }
+#endif
+
+#ifdef IOS
+    int is_keyboard_button_hidden =
+        mudclient_ios_ui_tabs_hidden(mud) ||
+        (mudclient_ios_is_watch_ui() && !mud->options->watch_keyboard_button);
+#else
+    int is_keyboard_button_hidden = 0;
+#endif
+
+    if (is_touch && !is_keyboard_button_hidden) {
         int keyboard_button_x = 0;
         int keyboard_button_y = 0;
 
@@ -267,16 +318,35 @@ void mudclient_send_chat_message(mudclient *mud, int8_t *encoded,
 
 void mudclient_handle_message_tabs_input(mudclient *mud) {
     int is_touch = mudclient_is_touch(mud);
-    int is_compact = mud->surface->width < MUD_VANILLA_WIDTH;
+    int tabs_width = message_tabs_width(mud);
+    int is_compact = tabs_width < MUD_VANILLA_WIDTH;
 
     float button_scale =
-        is_compact ? mud->surface->width / (float)MUD_MIN_WIDTH : 1;
+        is_compact ? tabs_width / (float)MUD_MIN_WIDTH : 1;
 
-    int bar_min_y = is_touch ? 0 : mud->surface->height - 16;
-    int bar_max_y = is_touch ? 30 : mud->surface->height;
+    /* the touch tabs are moved in from the top left by the safe insets */
+    int left = is_touch ? MUD_SAFE_LEFT : 0;
+    int top = is_touch ? MUD_SAFE_TOP : 0;
+    int tab_x = mud->mouse_x - left;
+
+    int bar_min_y = is_touch ? top : mud->surface->height - 16;
+    int bar_max_y = is_touch ? top + 30 : mud->surface->height;
     int bar_max_x = is_touch ? HBAR_WIDTH : mud->surface->width;
 
-    if (mud->last_mouse_button_down == 1 && mud->mouse_x <= bar_max_x &&
+#ifdef IOS
+    /* the watch has no chat tabs to tap, and the keyboard button is with
+     * the ui tab icons */
+    int is_watch_ui = mudclient_ios_is_watch_ui();
+    int is_keyboard_button_hidden =
+        mudclient_ios_ui_tabs_hidden(mud) ||
+        (is_watch_ui && !mud->options->watch_keyboard_button);
+#else
+    int is_watch_ui = 0;
+    int is_keyboard_button_hidden = 0;
+#endif
+
+    if (!is_watch_ui && mud->last_mouse_button_down == 1 &&
+        tab_x <= bar_max_x &&
         mud->mouse_y > bar_min_y && mud->mouse_y <= bar_max_y) {
         int all_min_x = (is_compact ? 12 * button_scale : 15);
         int all_max_x = (is_compact ? 75 * button_scale : 96);
@@ -290,26 +360,25 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
         int private_min_x = (is_compact ? 246 * button_scale : 318);
         int private_max_x = (is_compact ? 308 * button_scale : 395);
 
-        if (mud->mouse_x > all_min_x && mud->mouse_x < all_max_x) {
+        if (tab_x > all_min_x && tab_x < all_max_x) {
             mud->message_tab_selected = MESSAGE_TAB_ALL;
-        } else if (mud->mouse_x > chat_min_x && mud->mouse_x < chat_max_x) {
+        } else if (tab_x > chat_min_x && tab_x < chat_max_x) {
             mud->message_tab_selected = MESSAGE_TAB_CHAT;
 
             mud->panel_message_tabs
                 ->control_list_position[mud->control_text_list_chat] = 999999;
-        } else if (mud->mouse_x > quest_min_x && mud->mouse_x < quest_max_x) {
+        } else if (tab_x > quest_min_x && tab_x < quest_max_x) {
             mud->message_tab_selected = MESSAGE_TAB_QUEST;
 
             mud->panel_message_tabs
                 ->control_list_position[mud->control_text_list_quest] = 999999;
-        } else if (mud->mouse_x > private_min_x &&
-                   mud->mouse_x < private_max_x) {
+        } else if (tab_x > private_min_x && tab_x < private_max_x) {
             mud->message_tab_selected = MESSAGE_TAB_PRIVATE;
 
             mud->panel_message_tabs
                 ->control_list_position[mud->control_text_list_private] =
                 999999;
-        } else if (!is_compact && mud->mouse_x > 417 && mud->mouse_x < 497) {
+        } else if (!is_compact && tab_x > 417 && tab_x < 497) {
             if (mud->options->wiki_lookup) {
                 mud->selected_wiki = !mud->selected_wiki;
             }
@@ -339,8 +408,8 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
         char *chat_input =
             mud->panel_message_tabs->control_text[mud->control_text_list_all];
 
-        int chat_input_x = 11;
-        int chat_input_width = mud->surface->width - chat_input_x;
+        int chat_input_x = 11 + left;
+        int chat_input_width = mud->surface->width - MUD_SAFE_RIGHT - chat_input_x;
 
         if (chat_input_width > HBAR_WIDTH) {
             chat_input_width = HBAR_WIDTH;
@@ -353,15 +422,19 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
             chat_input_trigger_width = 32;
         }
 
-        int chat_input_y = 93;
+        int chat_input_y = 93 + top;
         int chat_input_height = 15;
 
+        /* the watch doesn't show the chat input line, so tapping where it
+         * would be mustn't open the keyboard */
         int is_within_chat_input =
+            !is_watch_ui &&
             (mud->mouse_x <= chat_input_x + chat_input_trigger_width &&
              mud->mouse_y >= chat_input_y - 8 &&
              mud->mouse_y <= chat_input_y + chat_input_height + 4);
 
         int is_within_button_input =
+            !is_keyboard_button_hidden &&
             (mud->mouse_x >= keyboard_button_x &&
              mud->mouse_x <=
                  keyboard_button_x +
@@ -386,11 +459,11 @@ void mudclient_handle_message_tabs_input(mudclient *mud) {
     }
 
     int text_list_width =
-        (is_compact ? mud->surface->width : MUD_VANILLA_WIDTH) -
-        (is_touch ? 14 : 0);
+        (is_compact ? tabs_width : MUD_VANILLA_WIDTH) -
+        (is_touch ? 14 : 0) + left;
 
-    int min_scrollbar_y = is_touch ? 0 : mud->surface->height - 78;
-    int max_scrollbar_y = is_touch ? 102 : mud->surface->height;
+    int min_scrollbar_y = is_touch ? top : mud->surface->height - 78;
+    int max_scrollbar_y = is_touch ? top + 102 : mud->surface->height;
 
     if (mud->message_tab_selected > 0 && mud->mouse_x >= text_list_width - 18 &&
         mud->mouse_x < text_list_width + 1 && mud->mouse_y >= min_scrollbar_y &&
@@ -509,6 +582,15 @@ void mudclient_show_message(mudclient *mud, char *message, MessageType type) {
         message_length = (int)strlen(message);
     }
 
+#ifdef IOS
+    /* once per message, not for each wrapped line */
+    static int wrap_depth = 0;
+
+    if (wrap_depth == 0) {
+        mudclient_ios_on_message(message, type);
+    }
+#endif
+
     /* handle wrapping */
     int is_compact = mud->surface->width < MUD_VANILLA_WIDTH;
     int max_text_width = (is_compact ? mud->surface->width : MUD_WIDTH) - 15;
@@ -538,7 +620,13 @@ void mudclient_show_message(mudclient *mud, char *message, MessageType type) {
                 message1[position] = '\0';
 
                 int message2_length = message_length - position;
+#ifdef IOS
+                wrap_depth++;
+#endif
                 mudclient_show_message(mud, message1, type);
+#ifdef IOS
+                wrap_depth--;
+#endif
 
                 if (last_colour[0] != 0) {
                     message2_length += 5;
@@ -563,7 +651,13 @@ void mudclient_show_message(mudclient *mud, char *message, MessageType type) {
                 strncpy(message2 + message2_offset, message + position + 1,
                         message2_length);
 
+#ifdef IOS
+                wrap_depth++;
+#endif
                 mudclient_show_message(mud, message2, type);
+#ifdef IOS
+                wrap_depth--;
+#endif
                 return;
             }
         }

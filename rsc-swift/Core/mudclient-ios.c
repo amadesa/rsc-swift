@@ -23,7 +23,14 @@ typedef enum {
     EVENT_KEY_DOWN,
     EVENT_KEY_UP,
     EVENT_ADD_WORLD,
-    EVENT_REMOVE_WORLD
+    EVENT_REMOVE_WORLD,
+    EVENT_COMBAT_STYLE,
+    EVENT_UI_TAB,
+    EVENT_UI_TAB_STEP,
+    EVENT_MENU_CHOICE,
+    EVENT_LOGIN,
+    EVENT_LOGIN_SCREEN,
+    EVENT_CHOOSE_WORLD
 } EventType;
 
 typedef struct {
@@ -36,6 +43,13 @@ typedef struct {
 } PendingWorld;
 
 typedef struct {
+    char username[USERNAME_LENGTH + 1];
+    char password[PASSWORD_LENGTH + 1];
+    char host[64];
+    int port;
+} PendingLogin;
+
+typedef struct {
     EventType type;
     intptr_t finger;
     float x;
@@ -43,6 +57,7 @@ typedef struct {
     int code;
     int char_code;
     PendingWorld *world; /* EVENT_ADD_WORLD, freed by the game thread */
+    PendingLogin *login; /* EVENT_LOGIN, wiped and freed by the game thread */
 } Event;
 
 static pthread_mutex_t event_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -53,6 +68,17 @@ static int event_tail = 0;
 static int requested_width = MUD_WIDTH;
 static int requested_height = MUD_HEIGHT;
 static int requested_resize = 0;
+
+/* top, left, bottom, right and the screen's corner radius in game pixels
+ * (rsc_set_safe_insets), and the ones in use, which only change with a
+ * resize on the game thread */
+static int requested_insets[5] = {0};
+static int safe_insets[5] = {0};
+
+/* from rsc_set_login, applied on the game thread */
+static char requested_username[USERNAME_LENGTH + 1];
+static char requested_password[PASSWORD_LENGTH + 1];
+static int requested_login = 0;
 
 static pthread_mutex_t frame_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t *frame_pixels = NULL;
@@ -70,6 +96,13 @@ static int keyboard_login_screen = -1;
 /* only read from other threads, for rsc_is_logged_in */
 static mudclient *ios_mud = NULL;
 static volatile int is_background = 0;
+static volatile int is_watch_ui = 0;
+static volatile int ui_tabs_revealed = 0;
+
+/* for rsc_get_login_state, under event_lock */
+static int logins_finished = 0;
+static char login_status[96];
+static char login_status_bottom[96];
 static char cache_dir[PATH_MAX] = {0};
 static char config_dir[PATH_MAX] = {0};
 
@@ -85,6 +118,21 @@ static float mudclient_touch_last_y = 0; // normalized
 static intptr_t mudclient_finger_1_id = 0;
 static intptr_t mudclient_finger_2_id = 0;
 
+/* wipes the password before freeing */
+static void free_login(PendingLogin *login) {
+    if (login == NULL) {
+        return;
+    }
+
+    volatile char *bytes = (volatile char *)login;
+
+    for (size_t i = 0; i < sizeof(*login); i++) {
+        bytes[i] = 0;
+    }
+
+    free(login);
+}
+
 static void push_event(Event event) {
     pthread_mutex_lock(&event_lock);
 
@@ -96,6 +144,7 @@ static void push_event(Event event) {
         event_head = next;
     } else {
         free(event.world);
+        free_login(event.login);
     }
 
     pthread_mutex_unlock(&event_lock);
@@ -149,15 +198,29 @@ void rsc_start(const RscConfig *new_config) {
     requested_height = new_config->height;
     clamp_size(&requested_width, &requested_height);
 
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    /* the client keeps some large buffers on the stack */
-    pthread_attr_setstacksize(&attr, 16 * 1024 * 1024);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    /* the client keeps some large buffers on the stack. watches have far
+     * less memory, so fall back to smaller stacks if the system refuses */
+    static const size_t stack_sizes[] = {16 << 20, 8 << 20, 4 << 20};
+    int started = 0;
 
-    pthread_t thread;
-    pthread_create(&thread, &attr, game_thread, NULL);
-    pthread_attr_destroy(&attr);
+    for (size_t i = 0; i < sizeof(stack_sizes) / sizeof(stack_sizes[0]); i++) {
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setstacksize(&attr, stack_sizes[i]);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+        pthread_t thread;
+        started = pthread_create(&thread, &attr, game_thread, NULL) == 0;
+        pthread_attr_destroy(&attr);
+
+        if (started) {
+            break;
+        }
+    }
+
+    if (!started) {
+        mud_error("couldn't start the game thread\n");
+    }
 }
 
 void rsc_resize(int width, int height) {
@@ -168,6 +231,36 @@ void rsc_resize(int width, int height) {
     requested_height = height;
     requested_resize = 1;
     pthread_mutex_unlock(&event_lock);
+}
+
+void rsc_set_safe_insets(int top, int left, int bottom, int right,
+                         int corner_radius) {
+    int insets[5] = {top, left, bottom, right, corner_radius};
+
+    pthread_mutex_lock(&event_lock);
+
+    for (int i = 0; i < 5; i++) {
+        int inset = insets[i] < 0 ? 0 : insets[i];
+
+        if (requested_insets[i] != inset) {
+            requested_insets[i] = inset;
+            /* the controls' panels are laid out on resize */
+            requested_resize = 1;
+        }
+    }
+
+    pthread_mutex_unlock(&event_lock);
+}
+
+int mudclient_ios_safe_inset(int edge) {
+    int inset = safe_insets[edge];
+
+    /* the surface is half the game size when the UI is scaled up */
+    if (ios_mud != NULL && mudclient_is_ui_scaled(ios_mud)) {
+        inset = (inset + 1) / 2;
+    }
+
+    return inset;
 }
 
 void rsc_touch(RscTouchPhase phase, intptr_t finger, float x, float y) {
@@ -229,6 +322,25 @@ void rsc_remove_world(int index) {
     push_event((Event){.type = EVENT_REMOVE_WORLD, .code = index});
 }
 
+void rsc_choose_world(int index) {
+    push_event((Event){.type = EVENT_CHOOSE_WORLD, .code = index});
+}
+
+/* a float is written whole on the platforms this runs on, and a frame drawn
+ * with the previous offset is harmless */
+static volatile float world_list_scroll = 0;
+
+/* where the game last drew the world list, for rsc_get_login_state */
+typedef struct {
+    int x, y, width, height, row_height, count, selected;
+} WorldListLayout;
+
+static WorldListLayout world_list = {0};
+
+void rsc_set_world_list_scroll(float pixels) { world_list_scroll = pixels; }
+
+float mudclient_ios_world_list_scroll(void) { return world_list_scroll; }
+
 void rsc_text(const char *text) {
     for (const char *c = text; *c != '\0'; c++) {
         if (isprint((unsigned char)*c)) {
@@ -256,6 +368,310 @@ int rsc_is_logged_in(void) {
 void rsc_set_background(int background) { is_background = background; }
 
 int mudclient_ios_is_background(void) { return is_background; }
+
+void rsc_set_watch_ui(int enabled) { is_watch_ui = enabled; }
+
+void rsc_set_ui_tabs_revealed(int revealed) { ui_tabs_revealed = revealed; }
+
+int mudclient_ios_is_watch_ui(void) { return is_watch_ui; }
+
+/* on the watch the ui tab icons stay out of the way until revealed */
+int mudclient_ios_ui_tabs_hidden(mudclient *mud) {
+    return is_watch_ui && !ui_tabs_revealed && mud->show_ui_tab == 0;
+}
+
+void rsc_get_status(RscStatus *status) {
+    mudclient *mud = ios_mud;
+
+    memset(status, 0, sizeof(*status));
+
+    if (mud == NULL || !mud->logged_in) {
+        return;
+    }
+
+    status->logged_in = 1;
+    snprintf(status->username, sizeof(status->username), "%s", mud->username);
+    status->hits = mud->player_skill_current[SKILL_HITS];
+    status->max_hits = mud->player_skill_base[SKILL_HITS];
+    status->prayer = mud->player_skill_current[SKILL_PRAYER];
+    status->max_prayer = mud->player_skill_base[SKILL_PRAYER];
+    status->fatigue = mud->stat_fatigue;
+    status->combat_style = mud->combat_style;
+    status->ui_tab = mud->show_ui_tab;
+
+    status->window_open =
+        mud->is_sleeping || mud->show_dialog_bank || mud->show_dialog_shop ||
+        mud->show_dialog_trade || mud->show_dialog_trade_confirm ||
+        mud->show_dialog_duel || mud->show_dialog_duel_confirm ||
+        mud->show_additional_options || mud->show_appearance_change;
+
+    status->inventory_count = mud->inventory_items_count;
+    status->dead = mud->death_screen_timeout > 0;
+
+    /* mudclient_handle_game_input logs out after 4500 untouched ticks */
+    status->idle_logout_seconds = -1;
+
+    if (mud->options->idle_logout && mud->combat_timeout == 0 &&
+        mud->target_fps > 0) {
+        int ticks = 4500 - mud->mouse_action_timeout;
+        status->idle_logout_seconds =
+            (ticks > 0 ? ticks : 0) * mud->target_fps / 1000;
+    }
+}
+
+void rsc_set_login(const char *username, const char *password) {
+    pthread_mutex_lock(&event_lock);
+    snprintf(requested_username, sizeof(requested_username), "%s", username);
+    snprintf(requested_password, sizeof(requested_password), "%s", password);
+    requested_login = 1;
+    pthread_mutex_unlock(&event_lock);
+}
+
+void rsc_login(const char *username, const char *password, const char *host,
+               int port) {
+    PendingLogin *login = calloc(1, sizeof(PendingLogin));
+
+    if (login == NULL) {
+        return;
+    }
+
+    snprintf(login->username, sizeof(login->username), "%s", username);
+    snprintf(login->password, sizeof(login->password), "%s", password);
+    snprintf(login->host, sizeof(login->host), "%s", host);
+    login->port = port;
+
+    push_event((Event){.type = EVENT_LOGIN, .login = login});
+}
+
+/* on the game thread, from mudclient_show_login_screen_status */
+void mudclient_ios_on_login_status(const char *status,
+                                   const char *status_bottom) {
+    pthread_mutex_lock(&event_lock);
+    snprintf(login_status, sizeof(login_status), "%s", status);
+    snprintf(login_status_bottom, sizeof(login_status_bottom), "%s",
+             status_bottom);
+    pthread_mutex_unlock(&event_lock);
+}
+
+static void finish_login(void) {
+    pthread_mutex_lock(&event_lock);
+    logins_finished++;
+    pthread_mutex_unlock(&event_lock);
+}
+
+static void handle_login(mudclient *mud, PendingLogin *login) {
+    if (mud->logged_in || mud->panel_login_existing_user == NULL) {
+        finish_login();
+        return;
+    }
+
+    mud->show_additional_options = 0;
+    mud->login_screen = LOGIN_STAGE_EXISTING;
+
+    panel_update_text(mud->panel_login_existing_user,
+                      mud->control_login_username, login->username);
+    panel_update_text(mud->panel_login_existing_user,
+                      mud->control_login_password, "");
+
+    if (!worldlist_select_address(mud, login->host, login->port)) {
+        mudclient_show_login_screen_status(
+            mud, "This account's world isn't in the world list.",
+            "Add it on the iPhone, then try again");
+        finish_login();
+        return;
+    }
+
+    snprintf(mud->login_username, sizeof(mud->login_username), "%s",
+             login->username);
+    snprintf(mud->login_pass, sizeof(mud->login_pass), "%s", login->password);
+
+    mudclient_login(mud, mud->login_username, mud->login_pass, 0);
+
+    /* mud->password keeps it for reconnecting */
+    memset(mud->login_pass, 0, sizeof(mud->login_pass));
+
+    finish_login();
+}
+
+void rsc_show_login_screen(RscLoginScreen screen) {
+    push_event((Event){.type = EVENT_LOGIN_SCREEN, .code = screen});
+}
+
+static void handle_login_screen(mudclient *mud, int screen) {
+    if (mud->logged_in || mud->panel_login_existing_user == NULL) {
+        return;
+    }
+
+    if (screen == RSC_LOGIN_SCREEN_OPTIONS) {
+        mud->login_screen = LOGIN_STAGE_WELCOME;
+        mud->show_additional_options = 1;
+    } else if (screen == RSC_LOGIN_SCREEN_WORLDS) {
+        mud->show_additional_options = 0;
+        mud->login_screen = LOGIN_STAGE_WORLD;
+    } else {
+        mud->show_additional_options = 0;
+        mud->login_screen = LOGIN_STAGE_WELCOME;
+    }
+}
+
+void rsc_get_login_state(RscLoginState *state) {
+    mudclient *mud = ios_mud;
+
+    memset(state, 0, sizeof(*state));
+
+    pthread_mutex_lock(&event_lock);
+    state->logins_finished = logins_finished;
+    snprintf(state->status, sizeof(state->status), "%s", login_status);
+    snprintf(state->status_bottom, sizeof(state->status_bottom), "%s",
+             login_status_bottom);
+    pthread_mutex_unlock(&event_lock);
+
+    if (mud == NULL || mud->loading_step != 0 ||
+        mud->panel_login_existing_user == NULL) {
+        return;
+    }
+
+    state->ready = 1;
+    state->screen = mud->login_screen;
+    state->options_open = mud->show_additional_options;
+
+    snprintf(state->world_host, sizeof(state->world_host), "%s", mud->server);
+    state->world_port = mud->port;
+    snprintf(state->world_name, sizeof(state->world_name), "%s",
+             worldlist_name_at(mud->server, mud->port));
+
+    /* as mudclient_draw_login_screens places it */
+    int is_compact = mud->surface->width < MUD_VANILLA_WIDTH ||
+                     mud->surface->height < MUD_VANILLA_HEIGHT;
+    int height = is_compact ? MUD_MIN_HEIGHT : MUD_VANILLA_HEIGHT;
+
+    state->logo_y = (mud->surface->height / 2) - (height / 2) + 10;
+    state->logo_height = is_compact ? 125 : 200;
+
+    state->frame_width = mud->surface->width;
+    state->frame_height = mud->surface->height;
+
+    /* the panel is rebuilt on the game thread, so it's read from the copy
+     * worldlist_draw_scrolling last published */
+    pthread_mutex_lock(&event_lock);
+    state->world_list_x = world_list.x;
+    state->world_list_y = world_list.y;
+    state->world_list_width = world_list.width;
+    state->world_list_height = world_list.height;
+    state->world_list_row_height = world_list.row_height;
+    state->world_count = world_list.count;
+    state->world_selected = world_list.selected;
+    pthread_mutex_unlock(&event_lock);
+}
+
+void mudclient_ios_publish_world_list(int x, int y, int width, int height,
+                                      int row_height, int count,
+                                      int selected) {
+    pthread_mutex_lock(&event_lock);
+    world_list = (WorldListLayout){x, y, width, height, row_height, count,
+                                   selected};
+    pthread_mutex_unlock(&event_lock);
+}
+
+void mudclient_ios_on_login(mudclient *mud, const char *username,
+                            const char *password) {
+    if (config.on_login == NULL) {
+        return;
+    }
+
+    config.on_login(config.context, username, password,
+                    worldlist_name_at(mud->server, mud->port), mud->server,
+                    mud->port);
+}
+
+static void apply_requested_login(mudclient *mud) {
+    char username[USERNAME_LENGTH + 1];
+    char password[PASSWORD_LENGTH + 1];
+
+    pthread_mutex_lock(&event_lock);
+    int should_apply = requested_login;
+    requested_login = 0;
+    memcpy(username, requested_username, sizeof(username));
+    memcpy(password, requested_password, sizeof(password));
+    pthread_mutex_unlock(&event_lock);
+
+    if (!should_apply || mud->logged_in) {
+        return;
+    }
+
+    snprintf(mud->options->username, sizeof(mud->options->username), "%s",
+             username);
+    snprintf(mud->options->password, sizeof(mud->options->password), "%s",
+             password);
+
+    if (mud->panel_login_existing_user != NULL) {
+        panel_update_text(mud->panel_login_existing_user,
+                          mud->control_login_username, username);
+        panel_update_text(mud->panel_login_existing_user,
+                          mud->control_login_password, password);
+    }
+}
+
+void mudclient_ios_on_message(char *message, int type) {
+    if (config.on_message != NULL) {
+        config.on_message(config.context, message, type);
+    }
+}
+
+void rsc_set_combat_style(int style) {
+    push_event((Event){.type = EVENT_COMBAT_STYLE, .code = style});
+}
+
+void rsc_show_ui_tab(int tab) {
+    push_event((Event){.type = EVENT_UI_TAB, .code = tab});
+}
+
+void rsc_step_ui_tab(int direction) {
+    push_event((Event){.type = EVENT_UI_TAB_STEP, .code = direction});
+}
+
+int rsc_ui_tabs_full_screen(void) {
+    mudclient *mud = ios_mud;
+
+    return mud != NULL && mud->options != NULL &&
+           mudclient_ui_tab_is_watch_full_screen(mud);
+}
+
+void rsc_choose_menu_item(int index) {
+    push_event((Event){.type = EVENT_MENU_CHOICE, .code = index});
+}
+
+/* hands the right click menu that just opened to the watch app */
+void mudclient_ios_show_menu(mudclient *mud) {
+    /* nothing could close a menu the app isn't shown */
+    if (config.on_menu == NULL || mud->menu_items_count <= 0) {
+        mud->show_right_click_menu = 0;
+        return;
+    }
+
+    /* far more than fit in a menu */
+    enum { MENU_SHOWN_MAX = 64 };
+
+    static char texts[MENU_SHOWN_MAX][160];
+    static const char *items[MENU_SHOWN_MAX];
+
+    int count = mud->menu_items_count;
+
+    if (count > MENU_SHOWN_MAX) {
+        count = MENU_SHOWN_MAX;
+    }
+
+    for (int i = 0; i < count; i++) {
+        struct MenuEntry *item = &mud->menu_items[mud->menu_indices[i]];
+
+        snprintf(texts[i], sizeof(texts[i]), "%s %s", item->action_text,
+                 item->target_text);
+
+        items[i] = texts[i];
+    }
+
+    config.on_menu(config.context, count, items);
+}
 
 const char *mudclient_ios_cache_dir(void) { return cache_dir; }
 
@@ -291,6 +707,29 @@ void mudclient_ios_play_sound(int16_t *pcm, int samples) {
 void mudclient_ios_open_url(char *url) {
     if (config.on_open_url != NULL) {
         config.on_open_url(config.context, url);
+    }
+}
+
+/* Stay connected in the background, kept by the app (Settings > RSC) and
+ * shown in Additional options > Game. read and written from both threads,
+ * but only ever 0 or 1 */
+static int stay_connected = 1;
+
+int *mudclient_ios_stay_connected(void) {
+    return is_watch_ui ? NULL : &stay_connected;
+}
+
+void rsc_set_stay_connected(int enabled) { stay_connected = enabled != 0; }
+
+int rsc_get_stay_connected(void) { return stay_connected; }
+
+int mudclient_ios_has_accounts(void) {
+    return config.on_request_accounts != NULL && !is_watch_ui;
+}
+
+void mudclient_ios_request_accounts(void) {
+    if (config.on_request_accounts != NULL) {
+        config.on_request_accounts(config.context);
     }
 }
 
@@ -594,7 +1033,7 @@ static void handle_touch_up(mudclient *mud, Event *event) {
 
     if (mudclient_finger_1_down && event->finger == mudclient_finger_1_id) {
         mudclient_finger_1_down = 0;
-
+    
         if (!mudclient_has_right_clicked && !mudclient_vertical_drag &&
             !mudclient_horizontal_drag && mudclient_pinch_distance == 0) {
             mudclient_mouse_pressed(mud, touch_x, touch_y, 0);
@@ -651,11 +1090,18 @@ void mudclient_poll_events(mudclient *mud) {
         pthread_mutex_lock(&event_lock);
         int should_resize = requested_resize;
         requested_resize = 0;
+
+        if (should_resize) {
+            memcpy(safe_insets, requested_insets, sizeof(safe_insets));
+        }
+
         pthread_mutex_unlock(&event_lock);
 
         if (should_resize) {
             mudclient_on_resize(mud);
         }
+
+        apply_requested_login(mud);
     }
 
     Event event;
@@ -691,9 +1137,68 @@ void mudclient_poll_events(mudclient *mud) {
 
             free(event.world);
             break;
+        case EVENT_LOGIN:
+            handle_login(mud, event.login);
+            free_login(event.login);
+            break;
+        case EVENT_LOGIN_SCREEN:
+            handle_login_screen(mud, event.code);
+            break;
         case EVENT_REMOVE_WORLD:
             if (mud->panel_login_worldlist != NULL) {
                 worldlist_remove(mud, event.code);
+            }
+            break;
+        case EVENT_CHOOSE_WORLD:
+            if (mud->panel_login_worldlist != NULL) {
+                worldlist_choose(mud, event.code);
+            }
+            break;
+        case EVENT_MENU_CHOICE:
+            if (mud->show_right_click_menu) {
+                if (event.code >= 0 && event.code < mud->menu_items_count) {
+                    mudclient_menu_item_click(mud,
+                                              mud->menu_indices[event.code]);
+                }
+
+                mud->show_right_click_menu = 0;
+            }
+            break;
+        case EVENT_UI_TAB:
+            if (mud->logged_in && event.code >= 0 && event.code <= 6) {
+                mud->show_ui_tab = event.code;
+
+                /* as if its icon was tapped: a tab closes when the pointer
+                 * is outside it (ui-tabs.c) */
+                if (event.code > 0 &&
+                    mudclient_ui_tab_is_watch_full_screen(mud)) {
+                    mudclient_ui_tab_point_at_header(mud);
+                } else if (event.code > 0 && mudclient_is_touch(mud)) {
+                    int size = UI_TABS_TOUCH_BUTTON_SIZE;
+
+                    mud->mouse_x = UI_TABS_TOUCH_X + size / 2;
+                    mud->mouse_y = UI_TABS_TOUCH_Y +
+                                   (event.code - 1) * (size - 2) + size / 2;
+                }
+            }
+            break;
+        case EVENT_UI_TAB_STEP:
+            if (mud->logged_in && mud->show_ui_tab != 0 &&
+                mudclient_ui_tab_is_watch_full_screen(mud)) {
+                mudclient_ui_tab_step(mud, event.code);
+                mudclient_ui_tab_point_at_header(mud);
+            }
+            break;
+        case EVENT_COMBAT_STYLE:
+            if (mud->logged_in && event.code >= 0 && event.code <= 3) {
+                mud->combat_style = event.code;
+
+                packet_stream_new_packet(mud->packet_stream,
+                                         CLIENT_COMBAT_STYLE);
+                packet_stream_put_byte(mud->packet_stream, mud->combat_style);
+                packet_stream_send_packet(mud->packet_stream);
+
+                mudclient_ios_save_combat_style(mud);
             }
             break;
         }

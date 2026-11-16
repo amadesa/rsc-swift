@@ -51,8 +51,8 @@ void options_set_defaults(Options *options) {
     options->registration = 0;
     options->idle_logout = 0;
 #ifdef IOS
-    /* the settings folder is kept out of device backups (GameClient.swift),
-     * so remembering the login stays on the phone */
+    /* the password is remembered in the keychain, not options.ini
+     * (options_save); the app fills it in on the login screen */
     options->remember_username = 1;
     options->remember_password = 1;
 #else
@@ -60,6 +60,9 @@ void options_set_defaults(Options *options) {
     options->remember_password = 0;
 #endif
     options->hide_register = 0;
+    options->watch_keyboard_button = 0;
+    options->watch_tab_panels = 1;
+    options->watch_tab_full_screen = 1;
     options->diversify_npcs = 0;
     options->rename_herblaw_items = 0;
 
@@ -151,6 +154,9 @@ void options_set_vanilla(Options *options) {
     options->remember_username = 0;
     options->remember_password = 0;
     options->hide_register = 0;
+    options->watch_keyboard_button = 0;
+    options->watch_tab_panels = 1;
+    options->watch_tab_full_screen = 1;
     options->diversify_npcs = 0;
     options->rename_herblaw_items = 0;
 
@@ -239,6 +245,14 @@ void options_save(Options *options) {
 
     char file_buffer[65536] = {0};
 
+#ifdef IOS
+    /* the apps keep passwords in the keychain and fill in the remembered
+     * one with rsc_set_login, so options.ini never holds it */
+    const char *saved_password = "";
+#else
+    const char *saved_password = options->password;
+#endif
+
     sprintf(file_buffer, OPTIONS_INI_TEMPLATE,
             options->members,               //
             options->fatigue,               //
@@ -257,10 +271,13 @@ void options_save(Options *options) {
             options->remember_username,     //
             options->remember_password,     //
             options->username,              //
-            options->password,              //
+            saved_password,                 //
             options->browser_command,       //
             options->camera_mode_chosen,    //
             options->hide_register,         //
+            options->watch_keyboard_button, //
+            options->watch_tab_panels,      //
+            options->watch_tab_full_screen, //
             options->diversify_npcs,        //
             options->rename_herblaw_items,  //
                                             //
@@ -370,6 +387,11 @@ void options_load(Options *options) {
     OPTION_INI_STR("browser_command", options->browser_command, 20);
     OPTION_INI_INT("camera_mode_chosen", options->camera_mode_chosen, 0, 1);
     OPTION_INI_INT("hide_register", options->hide_register, 0, 1);
+    OPTION_INI_INT("watch_keyboard_button", options->watch_keyboard_button, 0,
+                   1);
+    OPTION_INI_INT("watch_tab_panels", options->watch_tab_panels, 0, 1);
+    OPTION_INI_INT("watch_tab_full_screen", options->watch_tab_full_screen, 0,
+                   1);
 #ifdef RENDER_SW
     OPTION_INI_INT("diversify_npcs", options->diversify_npcs, 0, 1);
 #else

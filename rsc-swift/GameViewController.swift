@@ -3,6 +3,8 @@ import UIKit
 final class GameViewController: UIViewController {
     private let gameView = GameView()
     private var gameSize: (width: Int, height: Int)?
+    private var safeInsets: [Int] = []
+    private var loginStateTimer: Timer?
     private lazy var addWorld = AddWorldController(presenter: self) { world in
         GameClient.shared.add(world)
     }
@@ -15,13 +17,14 @@ final class GameViewController: UIViewController {
         gameView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(gameView)
 
-        // keep the game's edge UI (tabs, chat) clear of the notch and corners
-        let safeArea = view.safeEdges
+        // the 3D view fills the screen, into the corners and around the
+        // Dynamic Island; the game keeps its controls clear of them
+        // (rsc_set_safe_insets)
         NSLayoutConstraint.activate([
-            gameView.leadingAnchor.constraint(equalTo: safeArea.leading),
-            gameView.trailingAnchor.constraint(equalTo: safeArea.trailing),
-            gameView.topAnchor.constraint(equalTo: safeArea.top),
-            gameView.bottomAnchor.constraint(equalTo: safeArea.bottom),
+            gameView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            gameView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            gameView.topAnchor.constraint(equalTo: view.topAnchor),
+            gameView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
         GameClient.shared.onKeyboardRequest = { [weak self] text, isPassword in
@@ -42,6 +45,25 @@ final class GameViewController: UIViewController {
 
         GameClient.shared.onRegister = { [weak self] name, url in
             self?.register(worldName: name, url: url)
+        }
+
+        GameClient.shared.onAccountsRequest = { [weak self] in
+            guard let self = self, self.presentedViewController == nil else { return }
+            AccountsController.present(from: self) { account in
+                GameClient.shared.logIn(account)
+            }
+        }
+
+        GameClient.shared.onRelayProblem = { [weak self] steps in
+            self?.showRelayProblem(steps)
+        }
+
+        // the Worlds screen's list scrolls natively (GameView)
+        loginStateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self = self, GameClient.shared.isStarted else { return }
+            var state = RscLoginState()
+            rsc_get_login_state(&state)
+            self.gameView.updateWorldList(state, isLoggedIn: GameClient.shared.isLoggedIn)
         }
 
         let center = NotificationCenter.default
@@ -81,6 +103,15 @@ final class GameViewController: UIViewController {
             return
         }
 
+        // the safe area in game pixels, rounded out so nothing is under it.
+        // changing them lays the controls out again, like a resize
+        let insets = Self.safeInsets(of: view, gameWidth: size.width)
+        if insets != safeInsets {
+            safeInsets = insets
+            rsc_set_safe_insets(Int32(insets[0]), Int32(insets[1]), Int32(insets[2]),
+                                Int32(insets[3]), Int32(insets[4]))
+        }
+
         if let gameSize = gameSize, gameSize == size { return }
         gameSize = size
 
@@ -91,7 +122,20 @@ final class GameViewController: UIViewController {
         }
     }
 
-    private func confirmRemoveWorld(at index: Int, name: String) {
+    /// What's wrong with the connection through rsc-relay, link by link.
+    private func showRelayProblem(_ steps: [RelayCheck.Step]) {
+        // the game retries logins on its own; one report is enough
+        guard presentedViewController == nil else { return }
+
+        let alert = UIAlertController(
+            title: "Can't connect through the relay",
+            message: "\n" + RelayCheck.report(steps), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+
+        present(alert, animated: true)
+    }
+
+        private func confirmRemoveWorld(at index: Int, name: String) {
         let alert = UIAlertController(
             title: "Remove \(name)?",
             message: "You can add it again later with \"Add world\".",
@@ -128,6 +172,40 @@ final class GameViewController: UIViewController {
 
         return (Int((viewSize.width / scale).rounded()),
                 Int((viewSize.height / scale).rounded()))
+    }
+
+    /// The view's safe area insets (top, left, bottom, right) and the
+    /// screen's corner radius, in game pixels. None before iOS 11, which has
+    /// no notch or home indicator.
+    static func safeInsets(of view: UIView, gameWidth: Int) -> [Int] {
+        guard #available(iOS 11.0, *), view.bounds.width > 0, gameWidth > 0 else {
+            return [0, 0, 0, 0, 0]
+        }
+
+        let pixelsPerPoint = CGFloat(gameWidth) / view.bounds.width
+        let insets = view.safeAreaInsets
+        let radius = insets.bottom > 0 ? screenCornerRadius(view.window?.screen ?? UIScreen.main) : 0
+        return [insets.top, insets.left, insets.bottom, insets.right, radius]
+            .map { Int(($0 * pixelsPerPoint).rounded(.up)) }
+    }
+
+    /// How round the screen's corners are, in points, for keeping the
+    /// status bars inside them. iOS only says privately; if it won't, the
+    /// roundest iPhone's (the Pro Max models), which keeps them inside on
+    /// any screen with a home indicator.
+    private static func screenCornerRadius(_ screen: UIScreen) -> CGFloat {
+        let key = "_displayCornerRadius"
+        if screen.responds(to: NSSelectorFromString(key)),
+           let radius = screen.value(forKey: key) as? CGFloat, radius > 0 {
+            return radius
+        }
+        return 62
+    }
+
+    @available(iOS 11.0, *)
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        view.setNeedsLayout()
     }
 
     override var prefersStatusBarHidden: Bool { true }

@@ -61,6 +61,7 @@ xcrun swiftc -target "$TARGET" -sdk "$SDK" -O -parse-as-library \
 # 3. game data and licence
 cp "$SRC"/Resources/cache/* "$APP/"
 cp "$SRC/Core/COPYING" "$APP/"
+cp -R "$SRC/Settings.bundle" "$APP/"
 
 # 4. icons and launch images. Xcode 13's ibtool and actool don't run on
 # current macOS, so instead of a compiled storyboard and asset catalog use
@@ -111,6 +112,12 @@ cat > "$APP/Info.plist" <<PLIST
 	<key>CFBundleShortVersionString</key><string>$VERSION</string>
 	<key>CFBundleSupportedPlatforms</key><array><string>iPhoneOS</string></array>
 	<key>CFBundleVersion</key><string>1</string>
+	<key>UIBackgroundModes</key><array><string>audio</string></array>
+	<!-- rsc-relay's own HTTPS port, by IP address, with a pinned key
+	     (RelayRoute); world downloads are kept to https in the app -->
+	<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+	<key>NSLocalNetworkUsageDescription</key><string>RSC looks for your rsc-relay on the home network to pair with it.</string>
+	<key>NSBonjourServices</key><array><string>_rsc-relay._tcp</string></array>
 	<key>CFBundleIcons</key>
 	<dict>
 		<key>CFBundlePrimaryIcon</key>

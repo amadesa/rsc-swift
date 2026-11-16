@@ -4,9 +4,12 @@
 #define UI_TABS_WIDTH 245
 #define UI_BUTTON_SIZE 35
 
-#define UI_TABS_TOUCH_HEIGHT (((UI_BUTTON_SIZE - 2) * 6) + 1)
-#define UI_TABS_TOUCH_X (mud->surface->width - UI_BUTTON_SIZE - 11)
-#define UI_TABS_TOUCH_Y (mud->surface->height - UI_TABS_TOUCH_HEIGHT) - 30
+/* the column of tab icons on touch screens. on the watch the icons are
+ * bigger, filling the right edge */
+#define UI_TABS_TOUCH_BUTTON_SIZE mudclient_ui_tabs_touch_button_size(mud)
+#define UI_TABS_TOUCH_HEIGHT (((UI_TABS_TOUCH_BUTTON_SIZE - 2) * 6) + 1)
+#define UI_TABS_TOUCH_X mudclient_ui_tabs_touch_x(mud)
+#define UI_TABS_TOUCH_Y mudclient_ui_tabs_touch_y(mud)
 
 #define UI_TABS_LABEL_HEIGHT 10
 
@@ -29,6 +32,16 @@ void mudclient_draw_inventory_count(mudclient *mud);
 void mudclient_draw_inventory_icon(mudclient *mud, int x, int y,
                                    int is_selected);
 void mudclient_draw_magic_icon(mudclient *mud, int x, int y, int is_selected);
+int mudclient_ui_tabs_touch_button_size(mudclient *mud);
+int mudclient_ui_tabs_touch_x(mudclient *mud);
+int mudclient_ui_tabs_touch_y(mudclient *mud);
+int mudclient_ui_tab_is_watch_area(mudclient *mud);
+void mudclient_ui_tab_watch_area(mudclient *mud, int *x, int *y, int *width,
+                                 int *height);
+int mudclient_ui_tab_is_watch_full_screen(mudclient *mud);
+void mudclient_ui_tab_step(mudclient *mud, int direction);
+void mudclient_ui_tab_point_at_header(mudclient *mud);
+void mudclient_ui_tab_move_list(Panel *panel, int control, int x, int y);
 void mudclient_draw_ui_tabs(mudclient *mud);
 void mudclient_draw_ui_tab_label(mudclient *mud, int selected_tab, int width,
                                  int x, int y);

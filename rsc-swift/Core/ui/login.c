@@ -25,6 +25,7 @@ void mudclient_create_login_panels(mudclient *mud) {
     int stack_buttons = is_touch && !show_registration;
 
     mud->control_welcome_register = -1;
+    mud->control_welcome_accounts = -1;
 
     if (stack_buttons) {
         int stack_height = is_compact ? 22 : 24;
@@ -37,8 +38,8 @@ void mudclient_create_login_panels(mudclient *mud) {
                               "Welcome to RuneScape Classic",
                               is_compact ? FONT_BOLD_13 : FONT_BOLD_14, 1);
 
-        char *labels[4];
-        int *controls[4];
+        char *labels[5];
+        int *controls[5];
         int count = 0;
 
         labels[count] = "Login";
@@ -51,6 +52,12 @@ void mudclient_create_login_panels(mudclient *mud) {
             labels[count] = "Register";
             controls[count++] = &mud->control_welcome_register;
         }
+
+        /* the logins saved on this device, and which go to the watch */
+        if (mudclient_ios_has_accounts()) {
+            labels[count] = "Accounts";
+            controls[count++] = &mud->control_welcome_accounts;
+        }
 #endif
 
         if (mud->options->show_additional_options) {
@@ -61,18 +68,51 @@ void mudclient_create_login_panels(mudclient *mud) {
             controls[count++] = &mud->control_welcome_options;
         }
 
-        for (int i = 0; i < count; i++) {
-            panel_add_button_background(mud->panel_login_welcome, x, button_y,
-                                        stack_width, stack_height);
+        /* the lowest the buttons can reach before the blue bar along the
+         * bottom of the screen, in the panel's coordinates (the frame is
+         * centred on the screen, see mudclient_on_resize) */
+        int frame_height = is_compact ? MUD_MIN_HEIGHT : MUD_VANILLA_HEIGHT;
+        int frame_top = mud->surface->height / 2 - frame_height / 2;
+        int max_bottom = mud->surface->height - frame_top - 16 - 2;
 
-            panel_add_text_centre(mud->panel_login_welcome, x, button_y,
+        int column_bottom =
+            button_y + (count - 1) * stack_spacing + stack_height / 2;
+
+        /* when one column doesn't fit, Login keeps the whole first row and
+         * the rest go two to a row */
+        int use_grid = count > 2 && column_bottom > max_bottom;
+
+        int gap = 4;
+        int half_width = (stack_width - gap) / 2;
+        int half_offset = (half_width + gap) / 2;
+
+        for (int i = 0; i < count; i++) {
+            int button_x = x;
+            int button_width = stack_width;
+
+            if (use_grid && i > 0) {
+                int column = (i - 1) % 2;
+                int is_last_alone = column == 0 && i == count - 1;
+
+                if (!is_last_alone) {
+                    button_width = half_width;
+                    button_x = column == 0 ? x - half_offset : x + half_offset;
+                }
+            }
+
+            panel_add_button_background(mud->panel_login_welcome, button_x,
+                                        button_y, button_width, stack_height);
+
+            panel_add_text_centre(mud->panel_login_welcome, button_x, button_y,
                                   labels[i], FONT_BOLD_16, 0);
 
             *controls[i] =
-                panel_add_button(mud->panel_login_welcome, x, button_y,
-                                 stack_width, stack_height);
+                panel_add_button(mud->panel_login_welcome, button_x, button_y,
+                                 button_width, stack_height);
 
-            button_y += stack_spacing;
+            if (!use_grid || i == 0 || (i - 1) % 2 == 1) {
+                button_y += stack_spacing;
+            }
         }
     } else if (show_registration) {
         int offset_x = is_compact ? 16 : 0;
@@ -474,6 +514,10 @@ void mudclient_create_login_panels(mudclient *mud) {
 }
 
 void mudclient_show_login_screen_status(mudclient *mud, char *s, char *s1) {
+#ifdef IOS
+    mudclient_ios_on_login_status(s, s1);
+#endif
+
     int is_compact = mud->surface->width < MUD_VANILLA_WIDTH ||
                      mud->surface->height < MUD_VANILLA_HEIGHT;
 
@@ -893,6 +937,9 @@ void mudclient_draw_login_screens(mudclient *mud) {
         break;
     case LOGIN_STAGE_WORLD:
         panel_draw_panel(mud->panel_login_worldlist);
+#ifdef IOS
+        worldlist_draw_scrolling(mud);
+#endif
         break;
     }
 
@@ -1023,6 +1070,10 @@ void mudclient_handle_login_screen_input(mudclient *mud) {
                    panel_is_clicked(mud->panel_login_welcome,
                                     mud->control_welcome_register)) {
             worldlist_register(mud);
+        } else if (mud->control_welcome_accounts >= 0 &&
+                   panel_is_clicked(mud->panel_login_welcome,
+                                    mud->control_welcome_accounts)) {
+            mudclient_ios_request_accounts();
 #endif
         }
         return;

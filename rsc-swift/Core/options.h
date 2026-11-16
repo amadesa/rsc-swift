@@ -49,6 +49,12 @@ typedef struct Options Options;
      "camera_mode_chosen = %d\n\n"                                             \
      "; Hide the Register button on the login screen (iOS)\n"                 \
      "hide_register = %d\n\n"                                                  \
+     "; Show the keyboard button on the Apple Watch\n"                         \
+     "watch_keyboard_button = %d\n\n"                                          \
+     "; Fit the Apple Watch's tab panels to its screen (0 for the iPhone's)\n" \
+     "watch_tab_panels = %d\n\n"                                               \
+     "; Open the Apple Watch's tab panels full screen\n"                       \
+     "watch_tab_full_screen = %d\n\n"                                          \
      "; Diversify NPCs sent by server (custom)\n"                              \
      "diversify_npcs = %d\n\n"                                                 \
      "; Rename Herblaw items for ease of identification (custom)\n"            \
@@ -225,6 +231,17 @@ struct Options {
 
     /* leave Register off the login screen's buttons (iOS) */
     int hide_register;
+
+    /* the keyboard button on the Apple Watch, off to leave room */
+    int watch_keyboard_button;
+
+    /* the Apple Watch's tab panels go in the space left of the tab icons
+     * (ui-tabs.c); 0 places them as on the iPhone */
+    int watch_tab_panels;
+
+    /* with watch_tab_panels, an open panel covers the whole screen, hiding
+     * the icons; the crown or its header changes tab */
+    int watch_tab_full_screen;
 
     /* diversify NPCs sent by server (custom) */
     int diversify_npcs;

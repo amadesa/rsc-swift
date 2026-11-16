@@ -22,7 +22,14 @@ struct server_type {
 
 static struct server_type list[WORLDLIST_MAX] = {0};
 
+/* which defaults a saved list has been given, kept as a "#defaults N" line
+ * in worlds.cfg (older builds skip it). a world added to the defaults later
+ * is added to saved lists once, so removing it again sticks */
+#define WORLDLIST_DEFAULTS_VERSION 2
+
 static void worldlist_set_defaults(void);
+static void worldlist_set_2001scape(struct server_type *world);
+static int worldlist_add_new_defaults(int version, int count);
 static void worldlist_write(void);
 static void worldlist_read_presets(struct mudclient *mud);
 static void worldlist_populate(mudclient *mud);
@@ -45,6 +52,50 @@ static void worldlist_set_defaults(void) {
     strcpy(list[1].rsa_exponent, "00010001");
     strcpy(list[1].rsa_modulus, "86b03ac30518bdb3e508ca9660efc7738a73ee7dbedbcebf8c56d030a2bdae70503c60829b7fb5eceb529442234c21bce6d529c8da4fce870e83ceffc379e281");
     strcpy(list[1].register_url, worldlist_known_register_url(list[1].host));
+
+    worldlist_set_2001scape(&list[2]);
+}
+
+/* RSC Preservation's sister world on the 2001 game, on the same server and
+ * key (Open-RSC server/2001scape.conf) */
+static void worldlist_set_2001scape(struct server_type *world) {
+    memset(world, 0, sizeof(*world));
+    strcpy(world->name, "2001Scape");
+    strcpy(world->host, "game.openrsc.com");
+    world->port = USE_WEBSOCKS ? 43493 : 43593;
+    strcpy(world->rsa_exponent, "00010001");
+    strcpy(world->rsa_modulus, "87cef754966ecb19806238d9fecf0f421e816976f74f365c86a584e51049794d41fefbdc5fed3a3ed3b7495ba24262bb7d1dd5d2ff9e306b5bbf5522a2e85b25");
+    strcpy(world->register_url, worldlist_known_register_url(world->host));
+}
+
+/* gives a list saved with older defaults the worlds added since, returning
+ * the new count */
+static int worldlist_add_new_defaults(int version, int count) {
+    if (version >= 2 || count >= WORLDLIST_MAX - 1) {
+        return count;
+    }
+
+    int after = -1;
+
+    for (int i = 0; i < count; i++) {
+        if (strcmp(list[i].host, "game.openrsc.com") == 0 &&
+            (list[i].port == 43593 || list[i].port == 43493)) {
+            return count; /* already there */
+        }
+
+        if (strcmp(list[i].host, "192.3.118.9") == 0) {
+            after = i; /* Neat F2P */
+        }
+    }
+
+    /* under Neat F2P, as in the defaults, or last */
+    int index = after >= 0 ? after + 1 : count;
+
+    memmove(&list[index + 1], &list[index],
+            (count - index) * sizeof(struct server_type));
+    worldlist_set_2001scape(&list[index]);
+
+    return count + 1;
 }
 
 /* registration pages for servers we know about, so worlds saved without one
@@ -73,6 +124,8 @@ static void worldlist_write(void) {
     if (file == NULL) {
         return;
     }
+
+    fprintf(file, "#defaults %d\n", WORLDLIST_DEFAULTS_VERSION);
 
     for (int i = 0; list[i].name[0] != '\0'; ++i) {
         char name[sizeof(list[i].name)];
@@ -111,9 +164,15 @@ static void worldlist_read_presets(struct mudclient *mud) {
     memset(list, 0, sizeof(list));
 
     char line[1536];
+    int defaults_version = 1;
 
     while (num < WORLDLIST_MAX - 1 && fgets(line, sizeof(line), file)) {
         struct server_type *world = &list[num];
+
+        if (line[0] == '#') {
+            sscanf(line, "#defaults %d", &defaults_version);
+            continue;
+        }
 
         int res = sscanf(line, "%30s %60s %d %500s %500s %255s", world->name,
                          world->host, &world->port, world->rsa_exponent,
@@ -143,20 +202,24 @@ static void worldlist_read_presets(struct mudclient *mud) {
         return;
     }
 
+    /* saved before the current defaults: rewritten with the new worlds and
+     * the current version, so they're only added once */
+    int changed = defaults_version < WORLDLIST_DEFAULTS_VERSION;
+
+    num = worldlist_add_new_defaults(defaults_version, num);
+
     /* the world is officially called "RSC Preservation" (formerly OpenRSC);
      * rename the entry older builds saved */
-    int renamed = 0;
-
     for (int i = 0; i < num; i++) {
         if (strcmp(list[i].name, "OpenRSC_Preservation") == 0 &&
             strcmp(list[i].host, "game.openrsc.com") == 0 &&
             list[i].port == 43596) {
             strcpy(list[i].name, "RSC_Preservation");
-            renamed = 1;
+            changed = 1;
         }
     }
 
-    if (renamed) {
+    if (changed) {
         worldlist_write();
     }
 }
@@ -197,6 +260,21 @@ void worldlist_new(mudclient *mud) {
 
     int button_y =
         is_compact ? MUD_MIN_HEIGHT - 24 : MUD_VANILLA_HEIGHT - 32;
+
+#ifdef IOS
+    /* the compact layout leaves room for two worlds; grow the list into the
+     * empty space below, up to seven rows, and move the buttons down */
+    if (worldlist_scrolls_natively()) {
+        int box_height = is_compact ? MUD_MIN_HEIGHT : MUD_VANILLA_HEIGHT;
+        int room = (mud->surface->height - box_height) / 2 - 32;
+        int wanted = 7 * worldlist_row_height() - (button_y - 14 - y);
+        int extra = wanted < room ? wanted : room;
+
+        if (extra > 0) {
+            button_y += extra;
+        }
+    }
+#endif
 
     panel_add_button_background(mud->panel_login_worldlist,
         button_x, button_y, 60, 20);
@@ -240,6 +318,14 @@ void worldlist_new(mudclient *mud) {
     mud->control_list_worlds = panel_add_text_list_interactive(
         mud->panel_login_worldlist, x - 150, y, 250, list_height,
         FONT_REGULAR_11, 256, 1);
+
+#ifdef IOS
+    /* keeps the entries and selection, but worldlist_draw_scrolling draws
+     * it and the native scroll view takes its touches */
+    if (worldlist_scrolls_natively()) {
+        panel_hide(mud->panel_login_worldlist, mud->control_list_worlds);
+    }
+#endif
     worldlist_read_presets(mud);
     worldlist_populate(mud);
 
@@ -360,6 +446,106 @@ void worldlist_register(mudclient *mud) {
     }
 
     mudclient_ios_register(list[index].name, list[index].register_url);
+}
+
+int worldlist_select_address(mudclient *mud, const char *host, int port) {
+    for (int i = 0; i < worldlist_count(); i++) {
+        if (strcmp(list[i].host, host) == 0 && list[i].port == port) {
+            worldlist_select(mud, i);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+const char *worldlist_name_at(const char *host, int port) {
+    for (int i = 0; i < worldlist_count(); i++) {
+        if (strcmp(list[i].host, host) == 0 && list[i].port == port) {
+            return list[i].name;
+        }
+    }
+
+    return "";
+}
+
+/* the watch has its own native world list instead */
+int worldlist_scrolls_natively(void) { return !mudclient_ios_is_watch_ui(); }
+
+/* as panel_draw_text_list spaces rows for touch */
+int worldlist_row_height(void) {
+    return surface_text_height(FONT_REGULAR_11) + 6;
+}
+
+int worldlist_get_count(void) { return worldlist_count(); }
+
+void worldlist_choose(mudclient *mud, int index) {
+    if (index >= 0 && index < worldlist_count()) {
+        worldlist_select(mud, index);
+    }
+}
+
+/* the world list scrolled by pixels rather than whole rows, clipped to the
+ * list, with the classic scrollbar showing where it is */
+void worldlist_draw_scrolling(mudclient *mud) {
+    Panel *panel = mud->panel_login_worldlist;
+    int control = mud->control_list_worlds;
+
+    if (panel == NULL || !worldlist_scrolls_natively()) {
+        return;
+    }
+
+    int x = panel->control_x[control] + panel->offset_x;
+    int y = panel->control_y[control] + panel->offset_y;
+    int width = panel->control_width[control];
+    int height = panel->control_height[control];
+
+    int count = worldlist_count();
+    int row_height = worldlist_row_height();
+    int content_height = count * row_height;
+    int max_scroll = content_height > height ? content_height - height : 0;
+    int scroll = (int)mudclient_ios_world_list_scroll();
+    int has_scrollbar = content_height > height;
+
+    mudclient_ios_publish_world_list(x, y, width, height, row_height, count,
+                                     panel->control_activated[control]);
+
+    surface_set_bounds(mud->surface, x, y,
+                       x + width - (has_scrollbar ? 14 : 0), y + height);
+
+    for (int i = 0; i < count; i++) {
+        int row_y = y + i * row_height - scroll;
+
+        if (row_y + row_height <= y || row_y >= y + height) {
+            continue;
+        }
+
+        int colour =
+            panel->control_activated[control] == i ? RED : WHITE;
+
+        /* the baseline where panel_draw_text_list puts it */
+        surface_draw_string(
+            mud->surface, panel->control_list_entries[control][i], x + 2,
+            row_y + (surface_text_height(FONT_REGULAR_11) * 5) / 6 + 3,
+            FONT_REGULAR_11, colour);
+    }
+
+    surface_reset_bounds(mud->surface);
+
+    if (has_scrollbar) {
+        int track = height - 27;
+        int scrub_height = (track * height) / content_height;
+
+        if (scrub_height < 6) {
+            scrub_height = 6;
+        }
+
+        int position = scroll < 0 ? 0 : scroll > max_scroll ? max_scroll : scroll;
+        int scrub_y = ((track - scrub_height) * position) / max_scroll;
+
+        surface_draw_scrollbar(mud->surface, x, y, width, height, scrub_y,
+                               scrub_height);
+    }
 }
 #endif
 

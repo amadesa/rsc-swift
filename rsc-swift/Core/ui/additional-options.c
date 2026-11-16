@@ -110,6 +110,20 @@ void mudclient_create_options_panel(mudclient *mud) {
     mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
 
     y += OPTION_HORIZ_GAP;
+
+    /* kept by the app rather than options.ini, see GameClient.swift */
+    int *stay_connected = mudclient_ios_stay_connected();
+
+    if (stay_connected != NULL) {
+        control = mudclient_add_option_panel_checkbox(
+            mud->panel_game_options, "@whi@Stay connected: ", *stay_connected,
+            x, y);
+
+        mud->game_options[control] = stay_connected;
+        mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
+
+        y += OPTION_HORIZ_GAP;
+    }
 #endif
 
     control = mudclient_add_option_panel_checkbox(
@@ -217,6 +231,38 @@ void mudclient_create_options_panel(mudclient *mud) {
     mud->game_option_types[control] = ADDITIONAL_OPTIONS_INT;
 
     y += OPTION_HORIZ_GAP;
+
+#ifdef IOS
+    /* set on the iPhone, which sends its options to the watch */
+    if (!mudclient_ios_is_watch_ui()) {
+        control = mudclient_add_option_panel_checkbox(
+            mud->panel_game_options, "@whi@Watch keyboard: ",
+            mud->options->watch_keyboard_button, x, y);
+
+        mud->game_options[control] = &mud->options->watch_keyboard_button;
+        mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
+
+        y += OPTION_HORIZ_GAP;
+
+        control = mudclient_add_option_panel_checkbox(
+            mud->panel_game_options, "@whi@Watch tab panels: ",
+            mud->options->watch_tab_panels, x, y);
+
+        mud->game_options[control] = &mud->options->watch_tab_panels;
+        mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
+
+        y += OPTION_HORIZ_GAP;
+
+        control = mudclient_add_option_panel_checkbox(
+            mud->panel_game_options, "@whi@Watch full screen: ",
+            mud->options->watch_tab_full_screen, x, y);
+
+        mud->game_options[control] = &mud->options->watch_tab_full_screen;
+        mud->game_option_types[control] = ADDITIONAL_OPTIONS_CHECKBOX;
+
+        y += OPTION_HORIZ_GAP;
+    }
+#endif
 
     /* controls */
     x = ui_x + 4;

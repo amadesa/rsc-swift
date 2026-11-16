@@ -64,6 +64,10 @@ void init_packet_stream_global(void);
 
 struct PacketStream {
     int socket;
+#ifdef IOS
+    /* connected through rsc-relay (relay-transport.c) rather than socket */
+    int use_relay;
+#endif
     int closed;
     int delay;
     int length;

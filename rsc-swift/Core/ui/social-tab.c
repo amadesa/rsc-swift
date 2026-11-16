@@ -129,7 +129,10 @@ void mudclient_send_private_message(mudclient *mud, int64_t username,
 }
 
 void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
-    int ui_x = mud->surface->width - SOCIAL_WIDTH - 3;
+    /* wider on the watch, filling the space (ui-tabs.c) */
+    int panel_width = SOCIAL_WIDTH;
+
+    int ui_x = mud->surface->width - panel_width - 3;
     int ui_y = UI_BUTTON_SIZE + 1;
 
     int height = SOCIAL_HEIGHT;
@@ -138,13 +141,40 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
 
     if (is_touch) {
         height = 198;
-        ui_x = UI_TABS_TOUCH_X - SOCIAL_WIDTH - 1;
+        ui_x = UI_TABS_TOUCH_X - panel_width - 1;
         ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
+    }
+
+    if (mudclient_ui_tab_is_watch_area(mud)) {
+        mudclient_ui_tab_watch_area(mud, &ui_x, &ui_y, &panel_width, &height);
+
+        /* under the Friends/Ignore tabs and the heading, down to the "add"
+         * line along the bottom (see mudclient_start_game) */
+        int list_y = SOCIAL_TAB_HEIGHT + 16;
+
+        Panel *panel = mud->panel_social_list;
+        int list = mud->control_list_social;
+
+        panel->control_width[list] = panel_width;
+        panel->control_height[list] = height - list_y - 16;
+
+        mudclient_ui_tab_move_list(panel, list, ui_x, ui_y + list_y);
+    } else if (is_touch) {
+        /* as made (mudclient_start_game), in case the watch's panels were
+         * on before, and where the watch's taller icons put the panel */
+        Panel *panel = mud->panel_social_list;
+        int list = mud->control_list_social;
+
+        panel->control_width[list] = 196;
+        panel->control_height[list] = 126 + 16;
+
+        mudclient_ui_tab_move_list(panel, list, ui_x,
+                                   ui_y + SOCIAL_TAB_HEIGHT + 16);
     }
 
     if (mud->options->version_media >= 59) {
             mudclient_draw_ui_tab_label(mud, SOCIAL_TAB,
-                                        SOCIAL_WIDTH + !is_touch,
+                                        panel_width + !is_touch,
                                         ui_x - !is_touch,
                                         ui_y - UI_TABS_LABEL_HEIGHT);
     }
@@ -155,19 +185,19 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
     mud->ui_tab_max_y = 240;
 
     if (is_touch) {
-        mud->ui_tab_max_x = ui_x + SOCIAL_WIDTH;
+        mud->ui_tab_max_x = ui_x + panel_width;
         mud->ui_tab_min_y = ui_y - UI_TABS_LABEL_HEIGHT;
         mud->ui_tab_max_y = ui_y + height;
     }
 
     surface_draw_box_alpha(mud->surface, ui_x, ui_y + SOCIAL_TAB_HEIGHT,
-                           SOCIAL_WIDTH, height - SOCIAL_TAB_HEIGHT, GREY_DC,
+                           panel_width, height - SOCIAL_TAB_HEIGHT, GREY_DC,
                            128);
 
     surface_draw_line_horizontal(mud->surface, ui_x, ui_y + height - 16,
-                                 SOCIAL_WIDTH, BLACK);
+                                 panel_width, BLACK);
 
-    surface_draw_tabs(mud->surface, ui_x, ui_y, SOCIAL_WIDTH, SOCIAL_TAB_HEIGHT,
+    surface_draw_tabs(mud->surface, ui_x, ui_y, panel_width, SOCIAL_TAB_HEIGHT,
                       social_tabs, 2, mud->ui_tab_social_sub_tab);
 
     panel_clear_list(mud->panel_social_list, mud->control_list_social);
@@ -188,7 +218,7 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
             char formatted_username[USERNAME_LENGTH + 30] = {0};
 
             sprintf(formatted_username, "%s%s~%d~@whi@Remove", colour, username,
-                    ui_x + 126);
+                    ui_x + panel_width - 70);
 
             panel_add_list_entry(mud->panel_social_list,
                                  mud->control_list_social, i,
@@ -202,7 +232,7 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
             char formatted_username[USERNAME_LENGTH + 30] = {0};
 
             sprintf(formatted_username, "@yel@%s~%04d~@whi@Remove", username,
-                    ui_x + 126);
+                    ui_x + panel_width - 70);
 
             panel_add_list_entry(mud->panel_social_list,
                                  mud->control_list_social, i,
@@ -243,11 +273,11 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
         snprintf(formatted, SURFACE_STRING_MAX, "%s a name to send a message",
                  activate_verb);
 
-        if (friend_index >= 0 && mud->mouse_x < ui_x + 176) {
+        if (friend_index >= 0 && mud->mouse_x < ui_x + panel_width - 20) {
             char username[USERNAME_LENGTH + 1] = {0};
             decode_username(mud->friend_list[friend_index], username);
 
-            if (mud->mouse_x > ui_x + 116) {
+            if (mud->mouse_x > ui_x + panel_width - 80) {
                 sprintf(formatted, "%s to remove %s", activate_verb, username);
             } else if (mud->friend_list_online[friend_index] == FRIEND_ONLINE) {
                 sprintf(formatted, "%s to message %s", activate_verb, username);
@@ -270,19 +300,19 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
         }
 
         surface_draw_string_centre(mud->surface, formatted,
-                                   ui_x + (SOCIAL_WIDTH / 2), ui_y + 35,
+                                   ui_x + (panel_width / 2), ui_y + 35,
                                    FONT_BOLD_12, WHITE);
 
         int text_colour = BLACK;
 
-        if (mud->mouse_x > ui_x && mud->mouse_x < ui_x + SOCIAL_WIDTH &&
+        if (mud->mouse_x > ui_x && mud->mouse_x < ui_x + panel_width &&
             mud->mouse_y > ui_y + height - 16 && mud->mouse_y < ui_y + height) {
             text_colour = YELLOW;
         } else {
             text_colour = WHITE;
         }
 
-        surface_draw_stringf_centre(mud->surface, ui_x + (SOCIAL_WIDTH / 2),
+        surface_draw_stringf_centre(mud->surface, ui_x + (panel_width / 2),
                                     ui_y + height - 3, FONT_BOLD_12,
                                     text_colour, "%s here to add a friend",
                                     activate_verb);
@@ -293,20 +323,20 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
 
         strcpy(formatted, "Blocking messages from:");
 
-        if (ignore_index >= 0 && mud->mouse_x < ui_x + 176 &&
-            mud->mouse_x > ui_x + 116) {
+        if (ignore_index >= 0 && mud->mouse_x < ui_x + panel_width - 20 &&
+            mud->mouse_x > ui_x + panel_width - 80) {
             char username[USERNAME_LENGTH + 1] = {0};
             decode_username(mud->ignore_list[ignore_index], username);
             sprintf(formatted, "%s to remove %s", activate_verb, username);
         }
 
         surface_draw_string_centre(mud->surface, formatted,
-                                   ui_x + (SOCIAL_WIDTH / 2), ui_y + 35,
+                                   ui_x + (panel_width / 2), ui_y + 35,
                                    FONT_BOLD_12, WHITE);
 
         int text_colour = BLACK;
 
-        if (mud->mouse_x > ui_x && mud->mouse_x < ui_x + SOCIAL_WIDTH &&
+        if (mud->mouse_x > ui_x && mud->mouse_x < ui_x + panel_width &&
             mud->mouse_y > ui_y + height - 16 && mud->mouse_y < ui_y + height) {
             text_colour = YELLOW;
         } else {
@@ -314,7 +344,7 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
         }
 
         surface_draw_stringf_centre(
-            mud->surface, ui_x + (SOCIAL_WIDTH / 2), ui_y + height - 3,
+            mud->surface, ui_x + (panel_width / 2), ui_y + height - 3,
             FONT_BOLD_12, text_colour, "%s here to add a name", activate_verb);
     }
 
@@ -325,7 +355,7 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
     if (!handle_panel_input_early) {
         int is_within_x = mud->options->off_handle_scroll_drag
                               ? 1
-                              : mouse_x >= 0 && mouse_x < SOCIAL_WIDTH;
+                              : mouse_x >= 0 && mouse_x < panel_width;
 
         if (!is_within_x || !(mouse_y >= 0 && mouse_y < height)) {
             return;
@@ -337,10 +367,10 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
     }
 
     if (mouse_y <= SOCIAL_TAB_HEIGHT && mud->mouse_button_click == 1) {
-        if (mouse_x < (SOCIAL_WIDTH / 2) && mud->ui_tab_social_sub_tab == 1) {
+        if (mouse_x < (panel_width / 2) && mud->ui_tab_social_sub_tab == 1) {
             mud->ui_tab_social_sub_tab = 0;
             panel_reset_list(mud->panel_social_list, mud->control_list_social);
-        } else if (mouse_x > (SOCIAL_WIDTH / 2) &&
+        } else if (mouse_x > (panel_width / 2) &&
                    mud->ui_tab_social_sub_tab == 0) {
             mud->ui_tab_social_sub_tab = 1;
 

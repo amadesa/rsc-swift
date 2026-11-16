@@ -2590,7 +2590,10 @@ static void scene_rasterize(Scene *scene, int vertex_count, int32_t *vertices_x,
         }
 
         if (unlikely(i == RAMP_COUNT - 1)) {
-            int gradient_index = ((float)rand() / (float)RAND_MAX) * RAMP_COUNT;
+            /* rand() / RAND_MAX as floats rounds up to 1.0 for the top 64
+             * values, which gave RAMP_COUNT and wrote a ramp over the
+             * fields after gradient_ramps (scanlines, texture_dimension...) */
+            int gradient_index = rand() % RAMP_COUNT;
 
             scene->gradient_base[gradient_index] = face_fill;
             face_fill = -1 - face_fill;
