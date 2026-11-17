@@ -223,7 +223,7 @@ Wii and 3DS platform files and `lib/rsa/rsa-openssl.c`), then reapply
 - [Open-RSC](https://github.com/Open-RSC): the server software behind
   RSC Preservation and the [rsc.vet](https://rsc.vet) site.
 - App icon: the [2003scape](https://github.com/2003scape) organisation
-  avatar.
+  avatar's R and S stones, with a C stone added.
 - Libraries bundled with rsc-c: [ini](https://github.com/rxi/ini) (MIT),
   [ISAAC](https://burtleburtle.net/bob/rand/isaacafa.html),
   [micro-bunzip](https://landley.net/code/) and
