@@ -56,8 +56,7 @@ final class GameClient {
             fatalError("game cache files are missing from the app bundle")
         }
 
-        let configDirectory = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let configDirectory = AppDirectories.applicationSupport
         try? FileManager.default.createDirectory(
             at: configDirectory, withIntermediateDirectories: true)
         excludeFromBackup(configDirectory)

@@ -26,6 +26,8 @@ TARGET="armv7-apple-ios$MIN_IOS"
 # the app target's version (the first MARKETING_VERSION in the project)
 VERSION=$(sed -n 's/.*MARKETING_VERSION = \([0-9.]*\);/\1/p' \
     "$ROOT/rsc-swift.xcodeproj/project.pbxproj" | head -1)
+BUILD_NUMBER=$(sed -n 's/.*CURRENT_PROJECT_VERSION = \([0-9]*\);/\1/p' \
+    "$ROOT/rsc-swift.xcodeproj/project.pbxproj" | head -1)
 
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 BUILD="$OUT/intermediates"
@@ -111,7 +113,7 @@ cat > "$APP/Info.plist" <<PLIST
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>$VERSION</string>
 	<key>CFBundleSupportedPlatforms</key><array><string>iPhoneOS</string></array>
-	<key>CFBundleVersion</key><string>1</string>
+	<key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
 	<key>UIBackgroundModes</key><array><string>audio</string></array>
 	<!-- rsc-relay's own HTTPS port, by IP address, with a pinned key
 	     (RelayRoute); world downloads are kept to https in the app -->

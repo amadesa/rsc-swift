@@ -21,8 +21,7 @@ enum RetroData {
     /// Application Support/2001, the game's data_dir. Not backed up: it can
     /// be fetched again.
     static let directory: URL = {
-        let directory = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let directory = AppDirectories.applicationSupport
             .appendingPathComponent("2001", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: directory, withIntermediateDirectories: true)

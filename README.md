@@ -41,6 +41,26 @@ and later) plays the same game on the wrist, through
   Additional options > Game): the game keeps its connection while you use
   another app.
 
+## Installing
+
+All from [amadesa.github.io/rsc-swift](https://amadesa.github.io/rsc-swift/):
+
+- **AltStore or SideStore** (iOS 12.2 and later, with the Apple Watch
+  app): add the source `https://amadesa.github.io/rsc-swift/apps.json`.
+  Updates then show up in the app.
+- **Jailbroken devices** (Cydia, Sileo or Zebra): add the repo
+  `https://amadesa.github.io/rsc-swift/repo/`. It has RSC for iOS 12.2 and
+  later (rootful and rootless) and for iOS 10 on 32-bit devices such as
+  the iPad 4. iPhone and iPad only: a jailbreak can't install the watch
+  app.
+- **Sideloading** the IPAs from the
+  [releases](https://github.com/amadesa/rsc-swift/releases), e.g. with
+  [Sideloadly](https://sideloadly.io).
+
+The source, the repo and the page are built by
+`scripts/make-distribution.py` from a release's IPAs, into the `gh-pages`
+branch.
+
 ## Building
 
 Requires Xcode 16 or later.
@@ -154,6 +174,7 @@ rsc-swift/
   Settings.bundle             Settings app page for the relay
   AddWorldController.swift    "Add world" sheet
   WorldConfig.swift           world .ini parsing
+  AppDirectories.swift        where files go (a folder of its own on a jailbreak install)
   AccountStore.swift          saved logins, in the keychain
   AccountsController.swift    "Accounts" screen
   GameStatus.swift            hits, prayer etc. from the game, for alerts and the watch
@@ -172,6 +193,7 @@ Watch/
   KeepAlive.swift             keeps the game running with the wrist down
 scripts/rsc-c-ios.patch       every change made to the upstream rsc-c files
 scripts/build-legacy.sh       32-bit iOS 10 build using Xcode 13's tools
+scripts/make-distribution.py  AltStore/SideStore source and Cydia repo for a release
 relay/                        HTTPS-to-TCP relay so Apple Watch can connect (see relay/README.md)
 ```
 

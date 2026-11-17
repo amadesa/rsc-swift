@@ -11,8 +11,7 @@ final class WatchSync: NSObject, WCSessionDelegate {
     static let syncedFiles = ["options.ini", "worlds.cfg", "combat-styles.cfg"]
 
     let configDirectory: URL = {
-        let directory = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let directory = AppDirectories.applicationSupport
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         // nothing here is worth restoring from a backup
