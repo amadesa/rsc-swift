@@ -1,0 +1,47 @@
+{
+  "name": "RSC",
+  "identifier": "io.github.amadesa.rscswift.source",
+  "subtitle": "RuneScape Classic on iPhone, iPad and Apple Watch.",
+  "description": "A native RuneScape Classic client built on the 2003scape rsc-c client, with a touch-first interface. Plays RSC Preservation and other Open-RSC worlds, and 2001Scape's May 2001 game. Includes an Apple Watch app, which plays through rsc-relay (see the README).\n\nAn unofficial fan project, not affiliated with Jagex. Source and license (GNU AGPL v3.0): https://github.com/amadesa/rsc-swift",
+  "iconURL": "https://amadesa.github.io/rsc-swift/icon.png",
+  "website": "https://amadesa.github.io/rsc-swift/",
+  "tintColor": "6E7F8C",
+  "featuredApps": [
+    "io.github.amadesa.rscswift"
+  ],
+  "apps": [
+    {
+      "name": "RSC",
+      "bundleIdentifier": "io.github.amadesa.rscswift",
+      "developerName": "amadesa",
+      "subtitle": "RuneScape Classic on iPhone, iPad and Apple Watch.",
+      "localizedDescription": "A native RuneScape Classic client built on the 2003scape rsc-c client, with a touch-first interface. Plays RSC Preservation and other Open-RSC worlds, and 2001Scape's May 2001 game. Includes an Apple Watch app, which plays through rsc-relay (see the README).\n\nAn unofficial fan project, not affiliated with Jagex. Source and license (GNU AGPL v3.0): https://github.com/amadesa/rsc-swift",
+      "iconURL": "https://amadesa.github.io/rsc-swift/icon.png",
+      "tintColor": "6E7F8C",
+      "category": "games",
+      "versions": [
+        {
+          "version": "0.2.1",
+          "buildVersion": "2",
+          "date": "2026-11-17",
+          "localizedDescription": "New: install and update from AltStore or SideStore. Jailbroken devices: RSC is in a Cydia/Sileo/Zebra repo, with a folder of its own for its files.",
+          "downloadURL": "https://github.com/amadesa/rsc-swift/releases/download/v0.2.1/rsc-swift-0.2.1.ipa",
+          "size": 4789967,
+          "minOSVersion": "12.2"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSLocalNetworkUsageDescription": "RSC looks for your rsc-relay on the home network to pair with it."
+        }
+      },
+      "version": "0.2.1",
+      "versionDate": "2026-11-17",
+      "versionDescription": "New: install and update from AltStore or SideStore. Jailbroken devices: RSC is in a Cydia/Sileo/Zebra repo, with a folder of its own for its files.",
+      "downloadURL": "https://github.com/amadesa/rsc-swift/releases/download/v0.2.1/rsc-swift-0.2.1.ipa",
+      "size": 4789967
+    }
+  ],
+  "news": []
+}

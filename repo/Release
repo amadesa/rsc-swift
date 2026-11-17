@@ -1,0 +1,16 @@
+Origin: RSC
+Label: RSC
+Suite: stable
+Version: 1.0
+Codename: ios
+Architectures: iphoneos-arm iphoneos-arm64
+Components: main
+Description: RSC, a RuneScape Classic client (unofficial)
+MD5Sum:
+ 5f5ca3f701f234dd1d8d4933a72f2180 2462 Packages
+ d296c5200b82b4edf2e38e923929bbbc 759 Packages.gz
+ 07a1ee984369cf3b998353898d9b1473 912 Packages.bz2
+SHA256:
+ bc1a83303be0bb08a7a365c28fe987accd63a1fb56f72c4f7be7970f1d49323d 2462 Packages
+ 3260120ac36ce49de6d1a28742c54d8048fffa5d10b3dc1dd5df8eedfea253fa 759 Packages.gz
+ 49b98027856072aa50f75fe14d9f5f36b4bce9aef70950ce3ac274ce1f243d4f 912 Packages.bz2

@@ -1,0 +1,60 @@
+Package: io.github.amadesa.rscswift
+Name: RSC
+Architecture: iphoneos-arm
+Version: 0.2.1
+Section: Games
+Maintainer: amadesa <amadesa@users.noreply.github.com>
+Author: amadesa <amadesa@users.noreply.github.com>
+Homepage: https://github.com/amadesa/rsc-swift
+Icon: https://amadesa.github.io/rsc-swift/icon.png
+Depiction: https://amadesa.github.io/rsc-swift/
+Depends: firmware (>= 12.2)
+Conflicts: io.github.amadesa.rscswift.legacy
+Replaces: io.github.amadesa.rscswift.legacy
+Installed-Size: 2550
+Description: RuneScape Classic client (unofficial). iPhone and iPad; the Apple Watch app isn't included.
+Filename: debs/io.github.amadesa.rscswift_0.2.1_iphoneos-arm.deb
+Size: 1955656
+MD5sum: 141a7c0c4ad3d2d968d6c5dcccaa9852
+SHA1: f1f954a2b904d26c970c7f7380cc466b3481f0bc
+SHA256: 6f305c554fcb22a6e4fc41d021aa6de38237539d195a6fa86e7ab2e4b1ea3127
+
+Package: io.github.amadesa.rscswift
+Name: RSC
+Architecture: iphoneos-arm64
+Version: 0.2.1
+Section: Games
+Maintainer: amadesa <amadesa@users.noreply.github.com>
+Author: amadesa <amadesa@users.noreply.github.com>
+Homepage: https://github.com/amadesa/rsc-swift
+Icon: https://amadesa.github.io/rsc-swift/icon.png
+Depiction: https://amadesa.github.io/rsc-swift/
+Depends: firmware (>= 15.0)
+Installed-Size: 2550
+Description: RuneScape Classic client (unofficial). iPhone and iPad; the Apple Watch app isn't included.
+Filename: debs/io.github.amadesa.rscswift_0.2.1_iphoneos-arm64.deb
+Size: 1955726
+MD5sum: 007146e19f876ae3ad0a4bf64c1b2447
+SHA1: cedc4210c86961bb857c171c9fe624d2e6b5b510
+SHA256: 6ca1b9d31f0e06814c9eefc2e9da41338f88ddd8d28da0b061a3920da48ab475
+
+Package: io.github.amadesa.rscswift.legacy
+Name: RSC (iOS 10)
+Architecture: iphoneos-arm
+Version: 0.2.1
+Section: Games
+Maintainer: amadesa <amadesa@users.noreply.github.com>
+Author: amadesa <amadesa@users.noreply.github.com>
+Homepage: https://github.com/amadesa/rsc-swift
+Icon: https://amadesa.github.io/rsc-swift/icon.png
+Depiction: https://amadesa.github.io/rsc-swift/
+Depends: firmware (>= 10.0), firmware (<< 11.0)
+Conflicts: io.github.amadesa.rscswift
+Replaces: io.github.amadesa.rscswift
+Installed-Size: 40573
+Description: RuneScape Classic client (unofficial). iPhone and iPad; the Apple Watch app isn't included.
+Filename: debs/io.github.amadesa.rscswift.legacy_0.2.1_iphoneos-arm.deb
+Size: 19165678
+MD5sum: aa7ecfacac0d0c10171c484cdb63b770
+SHA1: e2b098d2cf310b331eb4f32dee770d7c447feaa9
+SHA256: 1d9b84dba73d457f28f00e22578e4b0c37268a5398f8bd27a21ad8ff2a4715e8
