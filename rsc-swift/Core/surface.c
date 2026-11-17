@@ -1421,7 +1421,7 @@ void surface_draw_sprite_scale(Surface *surface, int x, int y, int width,
     if (y < surface->bounds_min_y) {
         int l3 = surface->bounds_min_y - y;
         height -= l3;
-        y = 0;
+        y = surface->bounds_min_y;
         dest_pos += l3 * surface->width;
         i2 += k2 * l3;
     }
@@ -1433,7 +1433,7 @@ void surface_draw_sprite_scale(Surface *surface, int x, int y, int width,
     if (x < surface->bounds_min_x) {
         int i4 = surface->bounds_min_x - x;
         width -= i4;
-        x = 0;
+        x = surface->bounds_min_x;
         dest_pos += i4;
         l1 += j2 * i4;
         k3 += i4;
@@ -1638,7 +1638,7 @@ void surface_draw_sprite_scale_alpha(Surface *surface, int x, int y,
     if (y < surface->bounds_min_y) {
         int i4 = surface->bounds_min_y - y;
         scale_y -= i4;
-        y = 0;
+        y = surface->bounds_min_y;
         j3 += i4 * surface->width;
         j2 += l2 * i4;
     }
@@ -1649,7 +1649,7 @@ void surface_draw_sprite_scale_alpha(Surface *surface, int x, int y,
     if (x < surface->bounds_min_x) {
         int j4 = surface->bounds_min_x - x;
         scale_x -= j4;
-        x = 0;
+        x = surface->bounds_min_x;
         j3 += j4;
         i2 += k2 * j4;
         l3 += j4;
@@ -1739,7 +1739,7 @@ void surface_draw_sprite_scale_mask(Surface *surface, int x, int y, int width,
     if (y < surface->bounds_min_y) {
         int i4 = surface->bounds_min_y - y;
         height -= i4;
-        y = 0;
+        y = surface->bounds_min_y;
         j3 += i4 * surface->width;
         j2 += l2 * i4;
     }
@@ -1751,7 +1751,7 @@ void surface_draw_sprite_scale_mask(Surface *surface, int x, int y, int width,
     if (x < surface->bounds_min_x) {
         int j4 = surface->bounds_min_x - x;
         width -= j4;
-        x = 0;
+        x = surface->bounds_min_x;
         j3 += j4;
         i2 += k2 * j4;
         l3 += j4;

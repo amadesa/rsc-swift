@@ -32,6 +32,7 @@ void mudclient_draw_inventory_count(mudclient *mud);
 void mudclient_draw_inventory_icon(mudclient *mud, int x, int y,
                                    int is_selected);
 void mudclient_draw_magic_icon(mudclient *mud, int x, int y, int is_selected);
+int mudclient_ui_tabs_have_icons(mudclient *mud);
 int mudclient_ui_tabs_touch_button_size(mudclient *mud);
 int mudclient_ui_tabs_touch_x(mudclient *mud);
 int mudclient_ui_tabs_touch_y(mudclient *mud);

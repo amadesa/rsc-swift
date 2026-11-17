@@ -44,7 +44,7 @@ void mudclient_draw_ui_tab_inventory(mudclient *mud, int no_menus) {
         ui_x += area_width - width;
     }
 
-    if (mud->options->version_media >= 59) {
+    if (mudclient_ui_tabs_have_icons(mud)) {
             mudclient_draw_ui_tab_label(mud, INVENTORY_TAB, width, ui_x,
                                         ui_y - UI_TABS_LABEL_HEIGHT);
     }

@@ -19,6 +19,14 @@ static int is_watch_tabs(void) {
 #endif
 }
 
+/* whether the tabs are separate icons, with their labels drawn over the
+ * panels: the later media has icon sprites, and on touch screens the 2001
+ * game's are cut from its strip (draw_strip_icon). otherwise the 2001 strip,
+ * which has the labels, along the top as the 2001 client drew it */
+int mudclient_ui_tabs_have_icons(mudclient *mud) {
+    return mud->options->version_media >= 59 || mudclient_is_touch(mud);
+}
+
 int mudclient_ui_tabs_touch_button_size(mudclient *mud) {
     if (is_watch_tabs()) {
         /* six icons (overlapping by 2) from the top inset to the bottom */
@@ -171,6 +179,66 @@ static void draw_tab_sprite(mudclient *mud, int x, int y, int sprite_id,
     }
 }
 
+/* the 2001 media's tab strips: inv1, the six icons (options on the left
+ * to inventory on the right) 33 pixels apart, and inv2, one per tab with
+ * that tab's icon selected, 48 pixels further right */
+#define STRIP_ICON_SIZE 32
+#define STRIP_ICON_PITCH 33
+#define STRIP_SELECTED_OFFSET 48
+
+/* one tab's icon from the 2001 strips, scaled to the touch icons' size */
+static void draw_strip_icon(mudclient *mud, int x, int y, int tab,
+                            int is_selected) {
+    Surface *surface = mud->surface;
+    int sprite_id = mud->sprite_media + (is_selected ? tab : 0);
+
+#ifdef RENDER_SW
+    /* scaling needs the full colour pixels (as draw_tab_sprite) */
+    if (surface->surface_pixels[sprite_id] == NULL) {
+        if (surface->sprite_colours[sprite_id] == NULL) {
+            return;
+        }
+
+        surface_load_sprite(surface, sprite_id);
+    }
+#endif
+
+    if (surface->sprite_width[sprite_id] == 0) {
+        return;
+    }
+
+    int size = UI_TABS_TOUCH_BUTTON_SIZE - 3;
+
+    int strip_x = (6 - tab) * STRIP_ICON_PITCH +
+                  (is_selected ? STRIP_SELECTED_OFFSET : 0);
+
+    int width = surface->sprite_width[sprite_id] * size / STRIP_ICON_SIZE;
+    int height = surface->sprite_height[sprite_id] * size / STRIP_ICON_SIZE;
+
+    int min_x = surface->bounds_min_x;
+    int min_y = surface->bounds_min_y;
+    int max_x = surface->bounds_max_x;
+    int max_y = surface->bounds_max_y;
+
+    /* the strip drawn so that only this icon shows */
+    surface_set_bounds(surface, x, y, x + size + 1, y + size + 1);
+
+    int draw_x = x - strip_x * size / STRIP_ICON_SIZE;
+
+    if (is_selected) {
+        surface_draw_sprite_scale(surface, draw_x, y, width, height,
+                                  sprite_id, 0);
+    } else {
+        surface_draw_sprite_scale_alpha(surface, draw_x, y, width, height,
+                                        sprite_id, 128);
+    }
+
+    surface->bounds_min_x = min_x;
+    surface->bounds_min_y = min_y;
+    surface->bounds_max_x = max_x;
+    surface->bounds_max_y = max_y;
+}
+
 void mudclient_draw_inventory_count(mudclient *mud) {
     int is_touch = mudclient_is_touch(mud);
 
@@ -263,7 +331,7 @@ void mudclient_draw_ui_tabs(mudclient *mud) {
 
     int button_y = 3;
 
-    if (mud->options->version_media >= 59) {
+    if (mudclient_ui_tabs_have_icons(mud)) {
         int button_x = mud->surface->width - UI_BUTTON_SIZE;
 
         if (is_touch) {
@@ -280,6 +348,8 @@ void mudclient_draw_ui_tabs(mudclient *mud) {
             } else if (is_touch && selected_tab == MAGIC_TAB &&
                        mud->selected_spell >= 0) {
                 mudclient_draw_magic_icon(mud, button_x, button_y, 0);
+            } else if (mud->options->version_media < 59) {
+                draw_strip_icon(mud, button_x, button_y, selected_tab, 0);
             } else {
                 draw_tab_sprite(mud, button_x, button_y,
                                 mud->sprite_media + 33 + i, 128);
@@ -596,7 +666,7 @@ void mudclient_draw_active_ui_tab(mudclient *mud, int no_menus) {
         int selected_y = 3;
         int selected_x;
 
-        if (mud->options->version_media >= 59) {
+        if (mudclient_ui_tabs_have_icons(mud)) {
             selected_x = mud->surface->width -
                          UI_BUTTON_SIZE * mud->show_ui_tab +
                          (mud->show_ui_tab - 1) * 2;
@@ -615,6 +685,13 @@ void mudclient_draw_active_ui_tab(mudclient *mud, int no_menus) {
                 } else if (mud->show_ui_tab == MAGIC_TAB &&
                            mud->selected_spell >= 0) {
                     mudclient_draw_magic_icon(mud, selected_x, selected_y, 1);
+                    return;
+                }
+
+                if (mud->options->version_media < 59) {
+                    draw_strip_icon(mud, selected_x, selected_y,
+                                    mud->show_ui_tab, 1);
+                    mudclient_draw_inventory_count(mud);
                     return;
                 }
             }

@@ -73,7 +73,7 @@ void mudclient_draw_ui_tab_magic(mudclient *mud, int no_menus) {
         mudclient_ui_tab_move_list(panel, list, ui_x, ui_y + MAGIC_TAB_HEIGHT);
     }
 
-    if (mud->options->version_media >= 59) {
+    if (mudclient_ui_tabs_have_icons(mud)) {
         mudclient_draw_ui_tab_label(mud, MAGIC_TAB, panel_width + !is_touch,
                                     ui_x - !is_touch,
                                     ui_y - UI_TABS_LABEL_HEIGHT);

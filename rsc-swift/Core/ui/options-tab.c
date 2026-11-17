@@ -294,7 +294,7 @@ void mudclient_draw_ui_tab_options(mudclient *mud, int no_menus) {
                                     &area_height);
     }
 
-    if (mud->options->version_media >= 59) {
+    if (mudclient_ui_tabs_have_icons(mud)) {
         mudclient_draw_ui_tab_label(mud, OPTIONS_TAB, panel_width + !is_touch,
                                     ui_x - !is_touch,
                                     ui_y - UI_TABS_LABEL_HEIGHT);

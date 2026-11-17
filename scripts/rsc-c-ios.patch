@@ -1,6 +1,6 @@
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/game-switch.c b/game-switch.c
 --- a/game-switch.c	1969-12-31 18:00:00
-+++ b/game-switch.c	2026-11-16 14:39:47
++++ b/game-switch.c	2026-11-16 19:56:24
 @@ -0,0 +1,416 @@
 +#include "game-switch.h"
 +
@@ -420,7 +420,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +}
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/game-switch.h b/game-switch.h
 --- a/game-switch.h	1969-12-31 18:00:00
-+++ b/game-switch.h	2026-11-16 14:39:47
++++ b/game-switch.h	2026-11-16 19:56:24
 @@ -0,0 +1,46 @@
 +#ifndef _H_GAME_SWITCH
 +#define _H_GAME_SWITCH
@@ -470,7 +470,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +#endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/mudclient-ios.c b/mudclient-ios.c
 --- a/mudclient-ios.c	1969-12-31 18:00:00
-+++ b/mudclient-ios.c	2026-11-16 14:39:47
++++ b/mudclient-ios.c	2026-11-16 19:56:24
 @@ -0,0 +1,1259 @@
 +#include "mudclient.h"
 +#include "rsc-bridge.h"
@@ -1732,8 +1732,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +
 +#endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/mudclient.c b/mudclient.c
---- a/mudclient.c	2026-11-16 14:39:46
-+++ b/mudclient.c	2026-11-16 14:39:47
+--- a/mudclient.c	2026-11-16 19:56:23
++++ b/mudclient.c	2026-11-16 19:56:24
 @@ -1,5 +1,9 @@
  #include "mudclient.h"
  
@@ -2513,8 +2513,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  int main(int argc, char **argv) {
  #endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/mudclient.h b/mudclient.h
---- a/mudclient.h	2026-11-16 14:39:45
-+++ b/mudclient.h	2026-11-16 14:39:47
+--- a/mudclient.h	2026-11-16 19:56:23
++++ b/mudclient.h	2026-11-16 19:56:24
 @@ -66,7 +66,7 @@
       GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
  #endif
@@ -2738,8 +2738,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  void mudclient_trigger_keyboard(mudclient *mud, char *text, int is_password,
                                  int x, int y, int width, int height, int font,
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/options.c b/options.c
---- a/options.c	2026-11-16 14:39:46
-+++ b/options.c	2026-11-16 14:39:47
+--- a/options.c	2026-11-16 19:56:23
++++ b/options.c	2026-11-16 19:56:24
 @@ -50,8 +50,19 @@
      options->max_skills = 18;
      options->registration = 0;
@@ -2824,8 +2824,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      OPTION_INI_INT("diversify_npcs", options->diversify_npcs, 0, 1);
  #else
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/options.h b/options.h
---- a/options.h	2026-11-16 14:39:46
-+++ b/options.h	2026-11-16 14:39:47
+--- a/options.h	2026-11-16 19:56:23
++++ b/options.h	2026-11-16 19:56:24
 @@ -45,6 +45,16 @@
       "password = %s\n\n"                                                       \
       "; System command to use to open the web browser (only on desktop)\n"     \
@@ -2892,8 +2892,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  #endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/packet-handler.c b/packet-handler.c
---- a/packet-handler.c	2026-11-16 14:39:46
-+++ b/packet-handler.c	2026-11-16 14:39:47
+--- a/packet-handler.c	2026-11-16 19:56:23
++++ b/packet-handler.c	2026-11-16 19:56:24
 @@ -134,6 +134,13 @@
      }
  
@@ -2950,8 +2950,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      }
      case SERVER_PRIVACY_SETTINGS: {
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/packet-handler.h b/packet-handler.h
---- a/packet-handler.h	2026-11-16 14:39:46
-+++ b/packet-handler.h	2026-11-16 14:39:47
+--- a/packet-handler.h	2026-11-16 19:56:23
++++ b/packet-handler.h	2026-11-16 19:56:24
 @@ -4,6 +4,7 @@
  #include "client-opcodes.h"
  #include "mudclient.h"
@@ -2969,8 +2969,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  #endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/packet-stream.c b/packet-stream.c
---- a/packet-stream.c	2026-11-16 14:39:46
-+++ b/packet-stream.c	2026-11-16 14:39:47
+--- a/packet-stream.c	2026-11-16 19:56:23
++++ b/packet-stream.c	2026-11-16 19:56:24
 @@ -1,5 +1,10 @@
  #include "packet-stream.h"
 +#include "retro-packets.h"
@@ -3208,8 +3208,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          close(packet_stream->socket);
          packet_stream->socket = -1;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/packet-stream.h b/packet-stream.h
---- a/packet-stream.h	2026-11-16 14:39:46
-+++ b/packet-stream.h	2026-11-16 14:39:47
+--- a/packet-stream.h	2026-11-16 19:56:23
++++ b/packet-stream.h	2026-11-16 19:56:24
 @@ -64,9 +64,16 @@
  
  struct PacketStream {
@@ -3229,7 +3229,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      int packet_end;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/relay-transport.c b/relay-transport.c
 --- a/relay-transport.c	1969-12-31 18:00:00
-+++ b/relay-transport.c	2026-11-16 14:39:47
++++ b/relay-transport.c	2026-11-16 19:56:24
 @@ -0,0 +1,272 @@
 +#include "relay-transport.h"
 +#include "rsc-bridge.h"
@@ -3505,7 +3505,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +}
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/relay-transport.h b/relay-transport.h
 --- a/relay-transport.h	1969-12-31 18:00:00
-+++ b/relay-transport.h	2026-11-16 14:39:47
++++ b/relay-transport.h	2026-11-16 19:56:24
 @@ -0,0 +1,34 @@
 +#ifndef _H_RELAY_TRANSPORT
 +#define _H_RELAY_TRANSPORT
@@ -3543,7 +3543,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +#endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/retro-data.c b/retro-data.c
 --- a/retro-data.c	1969-12-31 18:00:00
-+++ b/retro-data.c	2026-11-16 14:39:47
++++ b/retro-data.c	2026-11-16 19:56:24
 @@ -0,0 +1,760 @@
 +#include "retro-data.h"
 +
@@ -4307,7 +4307,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +}
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/retro-data.h b/retro-data.h
 --- a/retro-data.h	1969-12-31 18:00:00
-+++ b/retro-data.h	2026-11-16 14:39:47
++++ b/retro-data.h	2026-11-16 19:56:24
 @@ -0,0 +1,48 @@
 +#ifndef _H_RETRO_DATA
 +#define _H_RETRO_DATA
@@ -4359,7 +4359,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +#endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/retro-packets.c b/retro-packets.c
 --- a/retro-packets.c	1969-12-31 18:00:00
-+++ b/retro-packets.c	2026-11-16 14:39:47
++++ b/retro-packets.c	2026-11-16 19:56:24
 @@ -0,0 +1,976 @@
 +#include "retro-packets.h"
 +
@@ -5339,7 +5339,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +}
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/retro-packets.h b/retro-packets.h
 --- a/retro-packets.h	1969-12-31 18:00:00
-+++ b/retro-packets.h	2026-11-16 14:39:47
++++ b/retro-packets.h	2026-11-16 19:56:24
 @@ -0,0 +1,30 @@
 +#ifndef _H_RETRO_PACKETS
 +#define _H_RETRO_PACKETS
@@ -5373,7 +5373,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +#endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/rsc-bridge.h b/rsc-bridge.h
 --- a/rsc-bridge.h	1969-12-31 18:00:00
-+++ b/rsc-bridge.h	2026-11-16 14:39:47
++++ b/rsc-bridge.h	2026-11-16 19:56:24
 @@ -0,0 +1,347 @@
 +#ifndef _H_RSC_BRIDGE
 +#define _H_RSC_BRIDGE
@@ -5723,8 +5723,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +
 +#endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/scene.c b/scene.c
---- a/scene.c	2026-11-16 14:39:46
-+++ b/scene.c	2026-11-16 14:39:47
+--- a/scene.c	2026-11-16 19:56:23
++++ b/scene.c	2026-11-16 19:56:24
 @@ -2590,7 +2590,10 @@
          }
  
@@ -5777,8 +5777,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  void scene_define_texture(Scene *scene, int id, int8_t *colours,
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/scene.h b/scene.h
---- a/scene.h	2026-11-16 14:39:46
-+++ b/scene.h	2026-11-16 14:39:47
+--- a/scene.h	2026-11-16 19:56:23
++++ b/scene.h	2026-11-16 19:56:24
 @@ -275,6 +275,10 @@
                        int roll, int distance);
  void scene_allocate_textures(Scene *scene, int count, int length_64,
@@ -5791,8 +5791,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
                            int32_t *palette, int wide128);
  #ifdef RENDER_SW
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/surface.c b/surface.c
---- a/surface.c	2026-11-16 14:39:46
-+++ b/surface.c	2026-11-16 14:39:47
+--- a/surface.c	2026-11-16 19:56:23
++++ b/surface.c	2026-11-16 19:56:24
 @@ -121,7 +121,7 @@
      surface->bounds_max_y = height;
  
@@ -5811,12 +5811,10 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  #else
  #ifdef SDL12
      SDL_BlitSurface(mud->pixel_surface, NULL, mud->screen, NULL);
-@@ -1165,6 +1167,43 @@
-     }
- 
+@@ -1167,6 +1169,43 @@
      return pixels;
-+}
-+
+ }
+ 
 +void surface_free_sprites(Surface *surface, int from, int to) {
 +    for (int i = from; i < to; i++) {
 +        int32_t *palette = surface->sprite_palette[i];
@@ -5852,12 +5850,68 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +        surface->sprite_translate_x[i] = 0;
 +        surface->sprite_translate_y[i] = 0;
 +    }
- }
- 
++}
++
  void surface_load_sprite(Surface *surface, int sprite_id) {
+ #ifdef RENDER_SW
+     surface->surface_pixels[sprite_id] =
+@@ -1382,7 +1421,7 @@
+     if (y < surface->bounds_min_y) {
+         int l3 = surface->bounds_min_y - y;
+         height -= l3;
+-        y = 0;
++        y = surface->bounds_min_y;
+         dest_pos += l3 * surface->width;
+         i2 += k2 * l3;
+     }
+@@ -1394,7 +1433,7 @@
+     if (x < surface->bounds_min_x) {
+         int i4 = surface->bounds_min_x - x;
+         width -= i4;
+-        x = 0;
++        x = surface->bounds_min_x;
+         dest_pos += i4;
+         l1 += j2 * i4;
+         k3 += i4;
+@@ -1599,7 +1638,7 @@
+     if (y < surface->bounds_min_y) {
+         int i4 = surface->bounds_min_y - y;
+         scale_y -= i4;
+-        y = 0;
++        y = surface->bounds_min_y;
+         j3 += i4 * surface->width;
+         j2 += l2 * i4;
+     }
+@@ -1610,7 +1649,7 @@
+     if (x < surface->bounds_min_x) {
+         int j4 = surface->bounds_min_x - x;
+         scale_x -= j4;
+-        x = 0;
++        x = surface->bounds_min_x;
+         j3 += j4;
+         i2 += k2 * j4;
+         l3 += j4;
+@@ -1700,7 +1739,7 @@
+     if (y < surface->bounds_min_y) {
+         int i4 = surface->bounds_min_y - y;
+         height -= i4;
+-        y = 0;
++        y = surface->bounds_min_y;
+         j3 += i4 * surface->width;
+         j2 += l2 * i4;
+     }
+@@ -1712,7 +1751,7 @@
+     if (x < surface->bounds_min_x) {
+         int j4 = surface->bounds_min_x - x;
+         width -= j4;
+-        x = 0;
++        x = surface->bounds_min_x;
+         j3 += j4;
+         i2 += k2 * j4;
+         l3 += j4;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/surface.h b/surface.h
---- a/surface.h	2026-11-16 14:39:46
-+++ b/surface.h	2026-11-16 14:39:47
+--- a/surface.h	2026-11-16 19:56:23
++++ b/surface.h	2026-11-16 19:56:24
 @@ -308,6 +308,10 @@
  int32_t *surface_palette_sprite_to_raster(Surface *surface, int sprite_id,
                                            int add_alpha);
@@ -5870,8 +5924,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
                                       int y, int width, int height);
  void surface_draw_sprite_reversed(Surface *surface, int sprite_id, int x, int y,
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/additional-options.c b/ui/additional-options.c
---- a/ui/additional-options.c	2026-11-16 14:39:46
-+++ b/ui/additional-options.c	2026-11-16 14:39:47
+--- a/ui/additional-options.c	2026-11-16 19:56:23
++++ b/ui/additional-options.c	2026-11-16 19:56:24
 @@ -100,7 +100,33 @@
  
      y += OPTION_HORIZ_GAP;
@@ -5984,8 +6038,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
          /* reset */
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/appearance.c b/ui/appearance.c
---- a/ui/appearance.c	2026-11-16 14:39:45
-+++ b/ui/appearance.c	2026-11-16 14:39:47
+--- a/ui/appearance.c	2026-11-16 19:56:23
++++ b/ui/appearance.c	2026-11-16 19:56:24
 @@ -149,9 +149,182 @@
      mud->control_appearance_accept =
          panel_add_button(mud->panel_appearance, x, y, APPEARANCE_ACCEPT_WIDTH,
@@ -6216,8 +6270,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      panel_draw_panel(mud->panel_appearance);
  
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/appearance.h b/ui/appearance.h
---- a/ui/appearance.h	2026-11-16 14:39:45
-+++ b/ui/appearance.h	2026-11-16 14:39:47
+--- a/ui/appearance.h	2026-11-16 19:56:23
++++ b/ui/appearance.h	2026-11-16 19:56:24
 @@ -21,7 +21,11 @@
  #define APPEARANCE_CHARACTER_WIDTH 64
  #define APPEARANCE_CHARACTER_HEIGHT 102
@@ -6231,8 +6285,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  void mudclient_draw_appearance_panel(mudclient *mud);
  
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/bank.c b/ui/bank.c
---- a/ui/bank.c	2026-11-16 14:39:45
-+++ b/ui/bank.c	2026-11-16 14:39:47
+--- a/ui/bank.c	2026-11-16 19:56:23
++++ b/ui/bank.c	2026-11-16 19:56:24
 @@ -327,7 +327,8 @@
      int horizontal_padding = (is_compact ? 100 : 142) + (is_touch ? 18 : 0);
  
@@ -6299,8 +6353,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      if (item_id != -1) {
          int bank_count = bank_items_count[mud->bank_selected_item_slot];
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/combat-style.c b/ui/combat-style.c
---- a/ui/combat-style.c	2026-11-16 14:39:45
-+++ b/ui/combat-style.c	2026-11-16 14:39:47
+--- a/ui/combat-style.c	2026-11-16 19:56:23
++++ b/ui/combat-style.c	2026-11-16 19:56:24
 @@ -8,6 +8,26 @@
      "Controlled (+1 each)", "Aggressive (+3 str.)", "Accurate (+3 att.)",
      "Defensive (+3 def.)"};
@@ -6352,8 +6406,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          }
      }
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/combat-style.h b/ui/combat-style.h
---- a/ui/combat-style.h	2026-11-16 14:39:45
-+++ b/ui/combat-style.h	2026-11-16 14:39:47
+--- a/ui/combat-style.h	2026-11-16 19:56:23
++++ b/ui/combat-style.h	2026-11-16 19:56:24
 @@ -5,6 +5,10 @@
  
  extern const char *combat_styles[];
@@ -6366,8 +6420,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  #endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/confirm.c b/ui/confirm.c
---- a/ui/confirm.c	2026-11-16 14:39:46
-+++ b/ui/confirm.c	2026-11-16 14:39:47
+--- a/ui/confirm.c	2026-11-16 19:56:23
++++ b/ui/confirm.c	2026-11-16 19:56:24
 @@ -86,7 +86,7 @@
              options_set_vanilla(mud->options);
              mudclient_sync_options_panels(mud);
@@ -6378,8 +6432,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  #ifndef SDL12
              SDL_RestoreWindow(mud->window);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/experience-drops.c b/ui/experience-drops.c
---- a/ui/experience-drops.c	2026-11-16 14:39:46
-+++ b/ui/experience-drops.c	2026-11-16 14:39:47
+--- a/ui/experience-drops.c	2026-11-16 19:56:23
++++ b/ui/experience-drops.c	2026-11-16 19:56:24
 @@ -33,7 +33,8 @@
          char formatted_amount[15] = {0};
          mudclient_format_number_commas(mud, experience, formatted_amount);
@@ -6391,8 +6445,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          size_t n = strlen(skill_name) + strlen(formatted_amount) +
                     strlen(formatted_remainder);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/inventory-tab.c b/ui/inventory-tab.c
---- a/ui/inventory-tab.c	2026-11-16 14:39:45
-+++ b/ui/inventory-tab.c	2026-11-16 14:39:47
+--- a/ui/inventory-tab.c	2026-11-16 19:56:23
++++ b/ui/inventory-tab.c	2026-11-16 19:56:24
 @@ -6,6 +6,7 @@
      int columns = mud->surface->height < 260 ? 6 : 5;
      int rows = (INVENTORY_ITEMS_MAX / columns);
@@ -6410,10 +6464,11 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          } else {
              ui_x = UI_TABS_TOUCH_X - width - 1;
          }
-@@ -24,6 +25,25 @@
+@@ -24,7 +25,26 @@
          ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
      }
  
+-    if (mud->options->version_media >= 59) {
 +    /* on the watch, bigger slots filling the space */
 +    if (mudclient_ui_tab_is_watch_area(mud) && !mud->show_dialog_bank) {
 +        int area_width = 0;
@@ -6433,9 +6488,10 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +        ui_x += area_width - width;
 +    }
 +
-     if (mud->options->version_media >= 59) {
++    if (mudclient_ui_tabs_have_icons(mud)) {
              mudclient_draw_ui_tab_label(mud, INVENTORY_TAB, width, ui_x,
                                          ui_y - UI_TABS_LABEL_HEIGHT);
+     }
 @@ -42,7 +62,7 @@
  
      /* item slots */
@@ -6488,8 +6544,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      if (item_index >= mud->inventory_items_count) {
          return;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/login.c b/ui/login.c
---- a/ui/login.c	2026-11-16 14:39:45
-+++ b/ui/login.c	2026-11-16 14:39:47
+--- a/ui/login.c	2026-11-16 19:56:23
++++ b/ui/login.c	2026-11-16 19:56:24
 @@ -20,7 +20,101 @@
      int show_registration =
          !mud->options->members || mud->options->registration;
@@ -6641,8 +6697,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          return;
      case LOGIN_STAGE_NEW:
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/magic-tab.c b/ui/magic-tab.c
---- a/ui/magic-tab.c	2026-11-16 14:39:45
-+++ b/ui/magic-tab.c	2026-11-16 14:39:47
+--- a/ui/magic-tab.c	2026-11-16 19:56:23
++++ b/ui/magic-tab.c	2026-11-16 19:56:24
 @@ -1,9 +1,38 @@
  #include "magic-tab.h"
 +#include "../retro-data.h"
@@ -6692,6 +6748,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
      }
  
+-    if (mud->options->version_media >= 59) {
+-        mudclient_draw_ui_tab_label(mud, MAGIC_TAB, MAGIC_WIDTH + !is_touch,
 +    if (mudclient_ui_tab_is_watch_area(mud)) {
 +        mudclient_ui_tab_watch_area(mud, &ui_x, &ui_y, &panel_width, &height);
 +
@@ -6720,8 +6778,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +        mudclient_ui_tab_move_list(panel, list, ui_x, ui_y + MAGIC_TAB_HEIGHT);
 +    }
 +
-     if (mud->options->version_media >= 59) {
--        mudclient_draw_ui_tab_label(mud, MAGIC_TAB, MAGIC_WIDTH + !is_touch,
++    if (mudclient_ui_tabs_have_icons(mud)) {
 +        mudclient_draw_ui_tab_label(mud, MAGIC_TAB, panel_width + !is_touch,
                                      ui_x - !is_touch,
                                      ui_y - UI_TABS_LABEL_HEIGHT);
@@ -6886,8 +6943,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
                  int i = 0;
  
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/menu.c b/ui/menu.c
---- a/ui/menu.c	2026-11-16 14:39:45
-+++ b/ui/menu.c	2026-11-16 14:39:47
+--- a/ui/menu.c	2026-11-16 19:56:23
++++ b/ui/menu.c	2026-11-16 19:56:24
 @@ -505,6 +505,8 @@
                  window.open(url, '_blank');
              },
@@ -6996,8 +7053,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      int entry_height = get_entry_height(mud);
  
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/message-tabs.c b/ui/message-tabs.c
---- a/ui/message-tabs.c	2026-11-16 14:39:45
-+++ b/ui/message-tabs.c	2026-11-16 14:39:47
+--- a/ui/message-tabs.c	2026-11-16 19:56:23
++++ b/ui/message-tabs.c	2026-11-16 19:56:24
 @@ -39,13 +39,23 @@
      panel_set_focus(mud->panel_message_tabs, mud->control_text_list_all);
  }
@@ -7492,8 +7549,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
              }
          }
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/message-tabs.h b/ui/message-tabs.h
---- a/ui/message-tabs.h	2026-11-16 14:39:45
-+++ b/ui/message-tabs.h	2026-11-16 14:39:47
+--- a/ui/message-tabs.h	2026-11-16 19:56:23
++++ b/ui/message-tabs.h	2026-11-16 19:56:24
 @@ -35,6 +35,10 @@
  void mudclient_send_command_string(mudclient *mud, char *command);
  void mudclient_send_chat_message(mudclient *mud, int8_t *encoded,
@@ -7506,8 +7563,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  void mudclient_decrement_message_flash(mudclient *mud);
  void mudclient_show_message(mudclient *mud, char *message, MessageType type);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/minimap-tab.c b/ui/minimap-tab.c
---- a/ui/minimap-tab.c	2026-11-16 14:39:45
-+++ b/ui/minimap-tab.c	2026-11-16 14:39:47
+--- a/ui/minimap-tab.c	2026-11-16 19:56:23
++++ b/ui/minimap-tab.c	2026-11-16 19:56:24
 @@ -13,18 +13,27 @@
  }
  
@@ -7550,8 +7607,9 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +        mud->ui_tab_max_y = ui_y + map_height;
      }
  
-     if (mud->options->version_media >= 59) {
+-    if (mud->options->version_media >= 59) {
 -        mudclient_draw_ui_tab_label(mud, MAP_TAB, MINIMAP_WIDTH, ui_x,
++    if (mudclient_ui_tabs_have_icons(mud)) {
 +        mudclient_draw_ui_tab_label(mud, MAP_TAB, map_width, ui_x,
                                      ui_y - UI_TABS_LABEL_HEIGHT);
      }
@@ -7647,8 +7705,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
          int temp_x = (delta_x * sin + delta_y * cos) >> 15;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/option-menu.c b/ui/option-menu.c
---- a/ui/option-menu.c	2026-11-16 14:39:45
-+++ b/ui/option-menu.c	2026-11-16 14:39:47
+--- a/ui/option-menu.c	2026-11-16 19:56:23
++++ b/ui/option-menu.c	2026-11-16 19:56:24
 @@ -1,12 +1,18 @@
  #include "option-menu.h"
 +#include "combat-style.h"
@@ -7671,8 +7729,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      if (mud->options->option_numbers) {
          int index = -1;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/options-tab.c b/ui/options-tab.c
---- a/ui/options-tab.c	2026-11-16 14:39:45
-+++ b/ui/options-tab.c	2026-11-16 14:39:47
+--- a/ui/options-tab.c	2026-11-16 19:56:23
++++ b/ui/options-tab.c	2026-11-16 19:56:24
 @@ -5,6 +5,85 @@
      return mud->options->members && !mud->options->lowmem;
  }
@@ -7785,6 +7843,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
      }
  
+-    if (mud->options->version_media >= 59) {
+-        mudclient_draw_ui_tab_label(mud, OPTIONS_TAB, OPTIONS_WIDTH + !is_touch,
 +    if (mudclient_ui_tab_is_watch_area(mud)) {
 +        int area_height = 0;
 +
@@ -7792,8 +7852,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +                                    &area_height);
 +    }
 +
-     if (mud->options->version_media >= 59) {
--        mudclient_draw_ui_tab_label(mud, OPTIONS_TAB, OPTIONS_WIDTH + !is_touch,
++    if (mudclient_ui_tabs_have_icons(mud)) {
 +        mudclient_draw_ui_tab_label(mud, OPTIONS_TAB, panel_width + !is_touch,
                                      ui_x - !is_touch,
                                      ui_y - UI_TABS_LABEL_HEIGHT);
@@ -8083,8 +8142,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
              mudclient_send_logout(mud);
          }
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/sleep.c b/ui/sleep.c
---- a/ui/sleep.c	2026-11-16 14:39:45
-+++ b/ui/sleep.c	2026-11-16 14:39:47
+--- a/ui/sleep.c	2026-11-16 19:56:23
++++ b/ui/sleep.c	2026-11-16 19:56:24
 @@ -130,6 +130,19 @@
                                  "@yel@%s here@whi@ to get a different one",
                                  is_touch ? "tap" : "click");
@@ -8140,8 +8199,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
                                     keyboard_y, keyboard_width, keyboard_height,
                                     FONT_BOLD_16, 1);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/social-tab.c b/ui/social-tab.c
---- a/ui/social-tab.c	2026-11-16 14:39:45
-+++ b/ui/social-tab.c	2026-11-16 14:39:47
+--- a/ui/social-tab.c	2026-11-16 19:56:23
++++ b/ui/social-tab.c	2026-11-16 19:56:24
 @@ -129,7 +129,10 @@
  }
  
@@ -8163,6 +8222,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          ui_y = (UI_TABS_TOUCH_Y + UI_TABS_TOUCH_HEIGHT) - height - 2;
      }
  
+-    if (mud->options->version_media >= 59) {
 +    if (mudclient_ui_tab_is_watch_area(mud)) {
 +        mudclient_ui_tab_watch_area(mud, &ui_x, &ui_y, &panel_width, &height);
 +
@@ -8190,7 +8250,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +                                   ui_y + SOCIAL_TAB_HEIGHT + 16);
 +    }
 +
-     if (mud->options->version_media >= 59) {
++    if (mudclient_ui_tabs_have_icons(mud)) {
              mudclient_draw_ui_tab_label(mud, SOCIAL_TAB,
 -                                        SOCIAL_WIDTH + !is_touch,
 +                                        panel_width + !is_touch,
@@ -8333,8 +8393,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
              mud->ui_tab_social_sub_tab = 1;
  
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/stats-tab.c b/ui/stats-tab.c
---- a/ui/stats-tab.c	2026-11-16 14:39:46
-+++ b/ui/stats-tab.c	2026-11-16 14:39:47
+--- a/ui/stats-tab.c	2026-11-16 19:56:23
++++ b/ui/stats-tab.c	2026-11-16 19:56:24
 @@ -12,9 +12,31 @@
  
  int skills_length;
@@ -8471,8 +8531,9 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      mud->panel_quests->control_height[mud->control_list_quest] =
          height - STATS_TAB_HEIGHT;
  
-     if (mud->options->version_media >= 59) {
+-    if (mud->options->version_media >= 59) {
 -            mudclient_draw_ui_tab_label(mud, STATS_TAB, STATS_WIDTH + !is_touch,
++    if (mudclient_ui_tabs_have_icons(mud)) {
 +            mudclient_draw_ui_tab_label(mud, STATS_TAB, panel_width + !is_touch,
                                          ui_x - !is_touch,
                                          ui_y - UI_TABS_LABEL_HEIGHT);
@@ -8779,8 +8840,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
              if (selected_tab < 0 || selected_tab >= total_tabs) {
                  return;
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/stats-tab.h b/ui/stats-tab.h
---- a/ui/stats-tab.h	2026-11-16 14:39:45
-+++ b/ui/stats-tab.h	2026-11-16 14:39:47
+--- a/ui/stats-tab.h	2026-11-16 19:56:23
++++ b/ui/stats-tab.h	2026-11-16 19:56:24
 @@ -17,6 +17,10 @@
  
  void init_stats_tab_global(void);
@@ -8793,8 +8854,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
                                       int line_break, int no_menus);
  void mudclient_draw_ui_tab_stats(mudclient *mud, int no_menus);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/status-bars.c b/ui/status-bars.c
---- a/ui/status-bars.c	2026-11-16 14:39:45
-+++ b/ui/status-bars.c	2026-11-16 14:39:47
+--- a/ui/status-bars.c	2026-11-16 19:56:23
++++ b/ui/status-bars.c	2026-11-16 19:56:24
 @@ -1,6 +1,259 @@
  #include "status-bars.h"
 +#include "combat-style.h"
@@ -9126,8 +9187,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
          surface_draw_string_right(mud->surface, formatted_effect, x, y,
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/status-bars.h b/ui/status-bars.h
---- a/ui/status-bars.h	2026-11-16 14:39:46
-+++ b/ui/status-bars.h	2026-11-16 14:39:47
+--- a/ui/status-bars.h	2026-11-16 19:56:23
++++ b/ui/status-bars.h	2026-11-16 19:56:24
 @@ -4,5 +4,6 @@
  #include "../mudclient.h"
  
@@ -9136,8 +9197,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  #endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/transaction.c b/ui/transaction.c
---- a/ui/transaction.c	2026-11-16 14:39:45
-+++ b/ui/transaction.c	2026-11-16 14:39:47
+--- a/ui/transaction.c	2026-11-16 19:56:23
++++ b/ui/transaction.c	2026-11-16 19:56:24
 @@ -1,5 +1,27 @@
  #include "transaction.h"
  
@@ -9212,15 +9273,15 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      } else {
          surface_draw_string_centre(mud->surface, "Waiting for other player...",
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/ui-tabs.c b/ui/ui-tabs.c
---- a/ui/ui-tabs.c	2026-11-16 14:39:45
-+++ b/ui/ui-tabs.c	2026-11-16 14:39:47
+--- a/ui/ui-tabs.c	2026-11-16 19:56:23
++++ b/ui/ui-tabs.c	2026-11-16 19:56:24
 @@ -1,3 +1,5 @@
 +#include <math.h>
 +
  #include "ui-tabs.h"
  
  char *mudclient_ui_tab_names[] = {"Inventory", "Map",     "Stats",
-@@ -5,6 +7,170 @@
+@@ -5,6 +7,238 @@
  
  static void mudclient_toggle_ui_tab(mudclient *mud, int tab);
  
@@ -9234,6 +9295,14 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +#else
 +    return 0;
 +#endif
++}
++
++/* whether the tabs are separate icons, with their labels drawn over the
++ * panels: the later media has icon sprites, and on touch screens the 2001
++ * game's are cut from its strip (draw_strip_icon). otherwise the 2001 strip,
++ * which has the labels, along the top as the 2001 client drew it */
++int mudclient_ui_tabs_have_icons(mudclient *mud) {
++    return mud->options->version_media >= 59 || mudclient_is_touch(mud);
 +}
 +
 +int mudclient_ui_tabs_touch_button_size(mudclient *mud) {
@@ -9388,10 +9457,70 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +    }
 +}
 +
++/* the 2001 media's tab strips: inv1, the six icons (options on the left
++ * to inventory on the right) 33 pixels apart, and inv2, one per tab with
++ * that tab's icon selected, 48 pixels further right */
++#define STRIP_ICON_SIZE 32
++#define STRIP_ICON_PITCH 33
++#define STRIP_SELECTED_OFFSET 48
++
++/* one tab's icon from the 2001 strips, scaled to the touch icons' size */
++static void draw_strip_icon(mudclient *mud, int x, int y, int tab,
++                            int is_selected) {
++    Surface *surface = mud->surface;
++    int sprite_id = mud->sprite_media + (is_selected ? tab : 0);
++
++#ifdef RENDER_SW
++    /* scaling needs the full colour pixels (as draw_tab_sprite) */
++    if (surface->surface_pixels[sprite_id] == NULL) {
++        if (surface->sprite_colours[sprite_id] == NULL) {
++            return;
++        }
++
++        surface_load_sprite(surface, sprite_id);
++    }
++#endif
++
++    if (surface->sprite_width[sprite_id] == 0) {
++        return;
++    }
++
++    int size = UI_TABS_TOUCH_BUTTON_SIZE - 3;
++
++    int strip_x = (6 - tab) * STRIP_ICON_PITCH +
++                  (is_selected ? STRIP_SELECTED_OFFSET : 0);
++
++    int width = surface->sprite_width[sprite_id] * size / STRIP_ICON_SIZE;
++    int height = surface->sprite_height[sprite_id] * size / STRIP_ICON_SIZE;
++
++    int min_x = surface->bounds_min_x;
++    int min_y = surface->bounds_min_y;
++    int max_x = surface->bounds_max_x;
++    int max_y = surface->bounds_max_y;
++
++    /* the strip drawn so that only this icon shows */
++    surface_set_bounds(surface, x, y, x + size + 1, y + size + 1);
++
++    int draw_x = x - strip_x * size / STRIP_ICON_SIZE;
++
++    if (is_selected) {
++        surface_draw_sprite_scale(surface, draw_x, y, width, height,
++                                  sprite_id, 0);
++    } else {
++        surface_draw_sprite_scale_alpha(surface, draw_x, y, width, height,
++                                        sprite_id, 128);
++    }
++
++    surface->bounds_min_x = min_x;
++    surface->bounds_min_y = min_y;
++    surface->bounds_max_x = max_x;
++    surface->bounds_max_y = max_y;
++}
++
  void mudclient_draw_inventory_count(mudclient *mud) {
      int is_touch = mudclient_is_touch(mud);
  
-@@ -13,9 +179,17 @@
+@@ -13,9 +247,17 @@
          return;
      }
  
@@ -9411,7 +9540,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      int count = mud->inventory_items_count;
  
      char colour[6] = {0};
-@@ -45,25 +219,29 @@
+@@ -45,25 +287,29 @@
  
  void mudclient_draw_inventory_icon(mudclient *mud, int x, int y,
                                     int is_selected) {
@@ -9448,7 +9577,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  }
  
  void mudclient_draw_ui_tabs(mudclient *mud) {
-@@ -73,6 +251,16 @@
+@@ -73,9 +319,19 @@
          return;
      }
  
@@ -9464,10 +9593,17 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +
      int button_y = 3;
  
-     if (mud->options->version_media >= 59) {
-@@ -93,12 +281,12 @@
+-    if (mud->options->version_media >= 59) {
++    if (mudclient_ui_tabs_have_icons(mud)) {
+         int button_x = mud->surface->width - UI_BUTTON_SIZE;
+ 
+         if (is_touch) {
+@@ -92,13 +348,15 @@
+             } else if (is_touch && selected_tab == MAGIC_TAB &&
                         mud->selected_spell >= 0) {
                  mudclient_draw_magic_icon(mud, button_x, button_y, 0);
++            } else if (mud->options->version_media < 59) {
++                draw_strip_icon(mud, button_x, button_y, selected_tab, 0);
              } else {
 -                surface_draw_sprite_alpha(mud->surface, button_x, button_y,
 -                                          mud->sprite_media + 33 + i, 128);
@@ -9481,7 +9617,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
              } else {
                  button_x -= UI_BUTTON_SIZE - 2;
              }
-@@ -114,6 +302,108 @@
+@@ -114,6 +372,108 @@
      mudclient_draw_inventory_count(mud);
  }
  
@@ -9590,7 +9726,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  static void mudclient_toggle_ui_tab(mudclient *mud, int tab) {
      if (mud->mouse_button_click != 0) {
          mud->show_ui_tab = mud->show_ui_tab == tab ? 0 : tab;
-@@ -139,7 +429,7 @@
+@@ -139,7 +499,7 @@
          offset_max_x = mud->surface->width;
  
          offset_min_y = UI_TABS_TOUCH_Y;
@@ -9599,7 +9735,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      }
  
      int is_dragging_scrollbar = 0;
-@@ -160,7 +450,26 @@
+@@ -160,7 +520,26 @@
  
      int has_changed_tab = 0;
  
@@ -9627,7 +9763,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
          int tab = i + 1;
  
          if (mud->mouse_x >= offset_min_x && mud->mouse_x < offset_max_x &&
-@@ -198,14 +507,32 @@
+@@ -198,14 +577,32 @@
          }
  
          if (mudclient_is_touch(mud)) {
@@ -9662,7 +9798,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      /* ui_tab_ boundary values will change next frame after the change */
      if (!has_changed_tab && !is_dragging_scrollbar && mud->show_ui_tab != 0 &&
          (mud->mouse_x < mud->ui_tab_min_x || mud->mouse_x > mud->ui_tab_max_x ||
-@@ -217,10 +544,25 @@
+@@ -217,10 +614,25 @@
  
  void mudclient_draw_ui_tab_label(mudclient *mud, int selected_tab, int width,
                                   int x, int y) {
@@ -9688,7 +9824,7 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      int label_offset = !mudclient_is_touch(mud) && mud->show_ui_tab > 4
                             ? width - mud->surface->sprite_width[sprite_id] - 3
                             : 1;
-@@ -244,6 +586,12 @@
+@@ -244,11 +656,17 @@
          mudclient_draw_ui_tab_options(mud, no_menus);
      }
  
@@ -9701,7 +9837,13 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      if (mud->show_ui_tab != 0) {
          int selected_y = 3;
          int selected_x;
-@@ -257,7 +605,7 @@
+ 
+-        if (mud->options->version_media >= 59) {
++        if (mudclient_ui_tabs_have_icons(mud)) {
+             selected_x = mud->surface->width -
+                          UI_BUTTON_SIZE * mud->show_ui_tab +
+                          (mud->show_ui_tab - 1) * 2;
+@@ -257,7 +675,7 @@
                  selected_x = UI_TABS_TOUCH_X;
  
                  selected_y = UI_TABS_TOUCH_Y +
@@ -9710,7 +9852,19 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
                  if (mud->show_ui_tab == INVENTORY_TAB &&
                      mud->selected_item_inventory_index >= 0) {
-@@ -274,8 +622,8 @@
+@@ -269,13 +687,20 @@
+                     mudclient_draw_magic_icon(mud, selected_x, selected_y, 1);
+                     return;
+                 }
++
++                if (mud->options->version_media < 59) {
++                    draw_strip_icon(mud, selected_x, selected_y,
++                                    mud->show_ui_tab, 1);
++                    mudclient_draw_inventory_count(mud);
++                    return;
++                }
+             }
+         } else {
              selected_x = mud->surface->width - UI_TABS_WIDTH - 3;
          }
  
@@ -9722,8 +9876,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
      mudclient_draw_inventory_count(mud);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/ui-tabs.h b/ui/ui-tabs.h
---- a/ui/ui-tabs.h	2026-11-16 14:39:45
-+++ b/ui/ui-tabs.h	2026-11-16 14:39:47
+--- a/ui/ui-tabs.h	2026-11-16 19:56:23
++++ b/ui/ui-tabs.h	2026-11-16 19:56:24
 @@ -4,9 +4,12 @@
  #define UI_TABS_WIDTH 245
  #define UI_BUTTON_SIZE 35
@@ -9740,10 +9894,11 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  #define UI_TABS_LABEL_HEIGHT 10
  
-@@ -29,6 +32,16 @@
+@@ -29,6 +32,17 @@
  void mudclient_draw_inventory_icon(mudclient *mud, int x, int y,
                                     int is_selected);
  void mudclient_draw_magic_icon(mudclient *mud, int x, int y, int is_selected);
++int mudclient_ui_tabs_have_icons(mudclient *mud);
 +int mudclient_ui_tabs_touch_button_size(mudclient *mud);
 +int mudclient_ui_tabs_touch_x(mudclient *mud);
 +int mudclient_ui_tabs_touch_y(mudclient *mud);
@@ -9758,8 +9913,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  void mudclient_draw_ui_tab_label(mudclient *mud, int selected_tab, int width,
                                   int x, int y);
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/worldlist.c b/ui/worldlist.c
---- a/ui/worldlist.c	2026-11-16 14:39:45
-+++ b/ui/worldlist.c	2026-11-16 14:39:47
+--- a/ui/worldlist.c	2026-11-16 19:56:23
++++ b/ui/worldlist.c	2026-11-16 19:56:24
 @@ -1,4 +1,5 @@
  #include "worldlist.h"
 +#include <assert.h>
@@ -10422,8 +10577,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
      }
  }
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/ui/worldlist.h b/ui/worldlist.h
---- a/ui/worldlist.h	2026-11-16 14:39:45
-+++ b/ui/worldlist.h	2026-11-16 14:39:47
+--- a/ui/worldlist.h	2026-11-16 19:56:23
++++ b/ui/worldlist.h	2026-11-16 19:56:24
 @@ -5,4 +5,34 @@
  
  void worldlist_new(mudclient *mud);
@@ -10460,8 +10615,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
 +#endif
  #endif
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/utility.c b/utility.c
---- a/utility.c	2026-11-16 14:39:46
-+++ b/utility.c	2026-11-16 14:39:47
+--- a/utility.c	2026-11-16 19:56:23
++++ b/utility.c	2026-11-16 19:56:24
 @@ -45,6 +45,8 @@
      char *pref_path = SDL_GetPrefPath("scape2003", "mudclient");
      snprintf(path, PATH_MAX, "%s%s", pref_path, file);
@@ -10534,8 +10689,8 @@ diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c
  
  #ifdef _3DS
 diff -ruN -x COPYING -x gl -x pica -x wii -x mudclient-sdl*.c -x mudclient-wii.c -x mudclient-3ds.c -x *-gl.c -x rsa-openssl.c a/utility.h b/utility.h
---- a/utility.h	2026-11-16 14:39:46
-+++ b/utility.h	2026-11-16 14:39:47
+--- a/utility.h	2026-11-16 19:56:23
++++ b/utility.h	2026-11-16 19:56:24
 @@ -25,6 +25,12 @@
  #include <citro3d.h>
  #include <tex3ds.h>

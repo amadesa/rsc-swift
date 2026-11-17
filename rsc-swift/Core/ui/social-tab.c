@@ -172,7 +172,7 @@ void mudclient_draw_ui_tab_social(mudclient *mud, int no_menus) {
                                    ui_y + SOCIAL_TAB_HEIGHT + 16);
     }
 
-    if (mud->options->version_media >= 59) {
+    if (mudclient_ui_tabs_have_icons(mud)) {
             mudclient_draw_ui_tab_label(mud, SOCIAL_TAB,
                                         panel_width + !is_touch,
                                         ui_x - !is_touch,

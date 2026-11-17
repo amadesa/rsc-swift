@@ -46,7 +46,7 @@ void mudclient_draw_ui_tab_minimap(mudclient *mud, int no_menus) {
         mud->ui_tab_max_y = ui_y + map_height;
     }
 
-    if (mud->options->version_media >= 59) {
+    if (mudclient_ui_tabs_have_icons(mud)) {
         mudclient_draw_ui_tab_label(mud, MAP_TAB, map_width, ui_x,
                                     ui_y - UI_TABS_LABEL_HEIGHT);
     }
