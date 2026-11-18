@@ -4,9 +4,11 @@
     scripts/make-distribution.py SITE MAIN_IPA LEGACY_IPA
 
 SITE is a checkout of the gh-pages branch, served at SITE_URL. The IPAs
-are the release's (rsc-swift-<version>.ipa and the legacy one), which must
-already be attached to the GitHub release v<version>: the AltStore source
-links to them there. Writes:
+are the release's (rsc-swift-<version>.ipa and the legacy one). Writes
+rsc-swift-<version>-no-watch.ipa next to MAIN_IPA: the main IPA without
+the watch app, for AltStore and SideStore, whose signing (ldid) crashes on
+the watch app's arm64_32 code. It must be attached to the GitHub release
+v<version> too: the source links to it there. In SITE, writes:
 
     apps.json        AltStore/SideStore source (new version first, the
                      earlier ones kept)
@@ -48,11 +50,14 @@ APP_NAME = "rsc-swift.app"
 TINT = "6E7F8C"
 
 SUBTITLE = "RuneScape Classic on iPhone, iPad and Apple Watch."
+# AltStore and SideStore install the IPA without the watch app
+SOURCE_SUBTITLE = "RuneScape Classic on iPhone and iPad."
 DESCRIPTION = (
     "A native RuneScape Classic client built on the 2003scape rsc-c client, "
     "with a touch-first interface. Plays RSC Preservation and other "
-    "Open-RSC worlds, and 2001Scape's May 2001 game. Includes an Apple "
-    "Watch app, which plays through rsc-relay (see the README).\n\n"
+    "Open-RSC worlds, and 2001Scape's May 2001 game.\n\n"
+    "The Apple Watch app isn't included here: AltStore and SideStore "
+    "can't sign it. It's in the IPA on the releases page.\n\n"
     "An unofficial fan project, not affiliated with Jagex. Source and "
     "license (GNU AGPL v3.0): " + HOMEPAGE)
 
@@ -120,7 +125,7 @@ def entitlements_of(binary):
 
 def app_permissions(app):
     """Every entitlement and usage description in the app and what it
-    contains (the watch app), which AltStore checks against the IPA."""
+    contains, which AltStore checks against the IPA."""
     entitlements = set()
     privacy = {}
 
@@ -138,6 +143,16 @@ def app_permissions(app):
                      "com.apple.developer.team-identifier"}
 
     return {"entitlements": sorted(entitlements), "privacy": privacy}
+
+
+def without_watch(ipa, out):
+    """A copy of the IPA without Payload/<app>/Watch/."""
+    watch = f"Payload/{APP_NAME}/Watch/"
+    with zipfile.ZipFile(ipa) as src, \
+            zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            if not item.filename.startswith(watch):
+                dst.writestr(item, src.read(item))
 
 
 def update_source(site, ipa, app, notes, date):
@@ -170,7 +185,7 @@ def update_source(site, ipa, app, notes, date):
     source = {
         "name": "RSC",
         "identifier": BUNDLE_ID + ".source",
-        "subtitle": SUBTITLE,
+        "subtitle": SOURCE_SUBTITLE,
         "description": DESCRIPTION,
         "iconURL": SITE_URL + "/icon.png",
         "website": SITE_URL + "/",
@@ -180,7 +195,7 @@ def update_source(site, ipa, app, notes, date):
             "name": "RSC",
             "bundleIdentifier": BUNDLE_ID,
             "developerName": "amadesa",
-            "subtitle": SUBTITLE,
+            "subtitle": SOURCE_SUBTITLE,
             "localizedDescription": DESCRIPTION,
             "iconURL": SITE_URL + "/icon.png",
             "tintColor": TINT,
@@ -476,7 +491,8 @@ a {{ color: inherit; }}
 
 <div class="card">
   <h2 style="margin-top:0">AltStore or SideStore</h2>
-  <p class="muted">iOS 12.2 or later. Includes the Apple Watch app.</p>
+  <p class="muted">iOS 12.2 or later. iPhone and iPad: AltStore and
+  SideStore can't install the Apple Watch app.</p>
   <div class="buttons">
     <a class="button" href="altstore://source?url={source}">Add to AltStore</a>
     <a class="button" href="sidestore://source?url={source}">Add to SideStore</a>
@@ -500,7 +516,8 @@ a {{ color: inherit; }}
 <div class="card">
   <h2 style="margin-top:0">Or download</h2>
   <p>The IPAs, to sideload with Sideloadly or another tool, are on the
-  <a href="{homepage}/releases/latest">releases page</a>.</p>
+  <a href="{homepage}/releases/latest">releases page</a>.
+  rsc-swift-&lt;version&gt;.ipa has the Apple Watch app.</p>
   <p class="muted">To play on the Apple Watch, set up
   <a href="{homepage}#apple-watch">rsc-relay</a> first.</p>
 </div>
@@ -548,9 +565,13 @@ def main():
     now = datetime.datetime.now(datetime.timezone.utc)
     mtime = int(now.timestamp())
 
+    base, _ = os.path.splitext(main_ipa)
+    sideload_ipa = base + "-no-watch.ipa"
+    without_watch(main_ipa, sideload_ipa)
+
     with tempfile.TemporaryDirectory() as work:
-        app = extract_app(main_ipa, work)
-        version = update_source(site, main_ipa, app, notes,
+        app = extract_app(sideload_ipa, work)
+        version = update_source(site, sideload_ipa, app, notes,
                                 now.strftime("%Y-%m-%d"))
 
     write_icons(site, root)
@@ -558,6 +579,7 @@ def main():
     write_page(site, version)
 
     print(f"built the source and repo for {version} in {site}")
+    print(f"attach {sideload_ipa} to the release v{version}")
 
 
 if __name__ == "__main__":
